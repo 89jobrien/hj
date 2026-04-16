@@ -19,6 +19,18 @@ name = "handoff-detect"
 path = "src/bin/handoff-detect.rs"
 
 [[bin]]
+name = "handoff"
+path = "src/bin/handoff.rs"
+
+[[bin]]
+name = "handon"
+path = "src/bin/handon.rs"
+
+[[bin]]
+name = "handover"
+path = "src/bin/handover.rs"
+
+[[bin]]
 name = "handoff-db"
 path = "src/bin/handoff-db.rs"
 

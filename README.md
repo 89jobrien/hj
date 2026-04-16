@@ -32,6 +32,9 @@
 | Binary | Role |
 |---|---|
 | `hj` | Main CLI |
+| `handoff` | Shortcut for `hj handoff` |
+| `handon` | Shortcut for `hj handon` |
+| `handover` | Shortcut for `hj handover` |
 | `handoff-detect` | Shortcut for `hj detect` |
 | `handoff-db` | Shortcut for `hj handoff-db` |
 | `handup` | Shortcut for `hj handup` |
@@ -41,6 +44,9 @@
 | Command | Purpose |
 |---|---|
 | `hj detect` | Resolve the active handoff path or repo metadata |
+| `hj handoff` | Write handoff YAML, state, `HANDOFF.md`, `HANDOVER.md`, SQLite sync, and reconcile output |
+| `hj handon` | Read the current repo handoff and print grouped P0/P1/P2 triage |
+| `hj handover` | Regenerate `.ctx/HANDOVER.md` from the current handoff and state |
 | `hj handoff-db` | Inspect or update the handoff SQLite store |
 | `hj handup` | Survey repos and TODO markers into a handup report |
 | `hj install` | Install binaries from the current checkout into `~/.local/bin` |
@@ -65,7 +71,7 @@ Manual equivalent from the repo root:
 env RUSTC_WRAPPER= cargo install --path crates/hj-cli --bins --force --root ~/.local
 ```
 
-`hj install` is intended to be run from an `hj` checkout. It installs `hj`, `handup`, `handoff-db`, and `handoff-detect` into `~/.local/bin` by default.
+`hj install` is intended to be run from an `hj` checkout. It installs `hj`, `handoff`, `handon`, `handover`, `handup`, `handoff-db`, and `handoff-detect` into `~/.local/bin` by default.
 
 ## Update
 
@@ -81,6 +87,9 @@ hj update
 
 ```text
 hj detect
+hj handoff
+hj handon
+hj handover
 hj handoff-db
 hj handup
 hj install
@@ -124,7 +133,22 @@ hj refresh
 Close out a handoff and render markdown:
 
 ```bash
+hj handoff --log-summary "Finished the current work slice"
 hj close --log-summary "Finished the current work slice"
+```
+
+Print repo-local triage:
+
+```bash
+hj handon
+handon --project hj
+```
+
+Regenerate the compact handover summary:
+
+```bash
+hj handover
+handover
 ```
 
 ## Development

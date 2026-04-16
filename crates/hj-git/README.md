@@ -13,6 +13,7 @@
 
 - Resolve repo roots and project names from the current working tree
 - Build canonical `.ctx/HANDOFF.*` and `.state.yaml` paths
+- Build canonical `.ctx/HANDOVER.md` output paths
 - Initialize missing state files during `hj refresh`
 - Scan nested repos for handoff files and TODO markers
 - Maintain the managed handoff block inside `.gitignore`
@@ -23,3 +24,4 @@
 - `hj-cli refresh`
 - `hj-cli handup`
 - `hj-cli close`
+- `hj-cli handover`

@@ -24,6 +24,7 @@ pub struct HandoffPaths {
     pub handoff_path: PathBuf,
     pub state_path: PathBuf,
     pub rendered_path: PathBuf,
+    pub handover_path: PathBuf,
     pub project: String,
     pub base_name: String,
 }
@@ -84,6 +85,7 @@ impl RepoContext {
         let handoff_path = ctx_dir.join(format!("HANDOFF.{project}.{}.yaml", self.base_name));
         let state_path = ctx_dir.join(format!("HANDOFF.{project}.{}.state.yaml", self.base_name));
         let rendered_path = ctx_dir.join("HANDOFF.md");
+        let handover_path = ctx_dir.join("HANDOVER.md");
 
         Ok(HandoffPaths {
             repo_root: self.repo_root.clone(),
@@ -91,6 +93,7 @@ impl RepoContext {
             handoff_path,
             state_path,
             rendered_path,
+            handover_path,
             project,
             base_name: self.base_name.clone(),
         })

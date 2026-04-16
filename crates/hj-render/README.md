@@ -5,13 +5,16 @@
 ## Provides
 
 - `render_markdown`
+- `render_handover_markdown`
 
 ## Responsibilities
 
 - Render project header state such as branch, build, and test status
 - Sort active items by priority and status for readable output
 - Render recent log entries into `HANDOFF.md`
+- Render compact state-first summaries into `HANDOVER.md`
 
 ## Used By
 
 - `hj-cli close`
+- `hj-cli handover`

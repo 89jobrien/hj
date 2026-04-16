@@ -1,1 +1,3 @@
-include!("../main.rs");
+fn main() {
+    hj_cli::main_entry();
+}

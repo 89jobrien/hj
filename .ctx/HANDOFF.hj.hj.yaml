@@ -1,39 +1,34 @@
 project: hj
 id: hj
-updated: "2026-04-16"
+updated: 2026-04-16
 items: []
 log:
-  - date: "2026-04-16"
-    summary: >
-      Fixed SQLite handoff pruning so `handoff-db upsert` deletes rows that are no
-      longer present in the current HANDOFF, covered the behavior with unit tests,
-      and verified the installed command now collapses hj down to an empty queue.
-    commits: []
-  - date: "2026-04-16"
-    summary: >
-      Verified handup end-to-end against the real ~/.ctx/handoffs output paths and
-      refreshed the installed ~/.local/bin hj command binaries from this workspace;
-      only the stale SQLite row pruning follow-up remains open.
-    commits: []
-  - date: "2026-04-16"
-    summary: >
-      Validated the in-progress handup implementation with cargo check and cargo test,
-      then captured the remaining end-to-end verification, CLI shim refresh, and
-      SQLite pruning follow-ups in the structured handoff.
-    commits: []
-  - date: "2026-04-16"
-    summary: >
-      Implemented handup survey parity in hj with nested HANDOFF and TODO scanning,
-      HANDUP.json output, and SQLite checkpoint history support.
-    commits: []
-  - date: "2026-04-16"
-    summary: >
-      Shipped direct handoff command binaries for hj by adding installable
-      handoff-detect and handoff-db entrypoints plus SQLite query/status parity.
-    commits: []
-  - date: "2026-04-16"
-    summary: >
-      Bootstrapped the hj workspace, published it to GitHub, and captured the first
-      handoff with a concrete command-parity next step.
-    commits:
-      - 854d1df
+- date: 2026-04-16
+  summary: Split hj-cli into library modules with thin binary entrypoints
+  commits:
+  - 6e2c922
+- date: 2026-04-16
+  summary: |
+    Fixed SQLite handoff pruning so `handoff-db upsert` deletes rows that are no longer present in the current HANDOFF, covered the behavior with unit tests, and verified the installed command now collapses hj down to an empty queue.
+  commits: []
+- date: 2026-04-16
+  summary: |
+    Verified handup end-to-end against the real ~/.ctx/handoffs output paths and refreshed the installed ~/.local/bin hj command binaries from this workspace; only the stale SQLite row pruning follow-up remains open.
+  commits: []
+- date: 2026-04-16
+  summary: |
+    Validated the in-progress handup implementation with cargo check and cargo test, then captured the remaining end-to-end verification, CLI shim refresh, and SQLite pruning follow-ups in the structured handoff.
+  commits: []
+- date: 2026-04-16
+  summary: |
+    Implemented handup survey parity in hj with nested HANDOFF and TODO scanning, HANDUP.json output, and SQLite checkpoint history support.
+  commits: []
+- date: 2026-04-16
+  summary: |
+    Shipped direct handoff command binaries for hj by adding installable handoff-detect and handoff-db entrypoints plus SQLite query/status parity.
+  commits: []
+- date: 2026-04-16
+  summary: |
+    Bootstrapped the hj workspace, published it to GitHub, and captured the first handoff with a concrete command-parity next step.
+  commits:
+  - 854d1df
