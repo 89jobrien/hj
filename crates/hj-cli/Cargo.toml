@@ -42,10 +42,10 @@ path = "src/bin/handup.rs"
 anyhow.workspace = true
 clap.workspace = true
 dirs.workspace = true
-hj-core = { version = "0.1.1", path = "../hj-core" }
-hj-doob = { version = "0.1.1", path = "../hj-doob" }
-hj-git = { version = "0.1.1", path = "../hj-git" }
-hj-render = { version = "0.1.1", path = "../hj-render" }
-hj-sqlite = { version = "0.1.1", path = "../hj-sqlite" }
+hj-core = { version = "0.1.2", path = "../hj-core" }
+hj-doob = { version = "0.1.2", path = "../hj-doob" }
+hj-git = { version = "0.1.2", path = "../hj-git" }
+hj-render = { version = "0.1.2", path = "../hj-render" }
+hj-sqlite = { version = "0.1.2", path = "../hj-sqlite" }
 serde_json.workspace = true
 serde_yaml.workspace = true

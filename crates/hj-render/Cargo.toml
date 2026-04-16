@@ -11,4 +11,4 @@ keywords = ["handoff", "render", "markdown"]
 categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
-hj-core = { version = "0.1.1", path = "../hj-core" }
+hj-core = { version = "0.1.2", path = "../hj-core" }
