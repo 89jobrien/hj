@@ -1,20 +1,14 @@
 project: hj
 id: hj
 updated: "2026-04-16"
-items:
-  - id: hj-4
-    name: handoff-db-prune
-    priority: P2
-    status: open
-    title: Prune stale SQLite handoff rows
-    description: >
-      handoff-db query still returns hj-2 as open even though the structured handoff
-      items list is empty. The upsert flow currently only inserts or updates rows, so
-      removed items are not cleared from SQLite.
-    files:
-      - crates/hj-cli/src/main.rs
-      - crates/hj-sqlite/src/lib.rs
+items: []
 log:
+  - date: "2026-04-16"
+    summary: >
+      Fixed SQLite handoff pruning so `handoff-db upsert` deletes rows that are no
+      longer present in the current HANDOFF, covered the behavior with unit tests,
+      and verified the installed command now collapses hj down to an empty queue.
+    commits: []
   - date: "2026-04-16"
     summary: >
       Verified handup end-to-end against the real ~/.ctx/handoffs output paths and

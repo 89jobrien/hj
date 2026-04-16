@@ -2,7 +2,7 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 use hj_core::Handoff;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, params_from_iter};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HandoffRow {
@@ -56,12 +56,13 @@ impl HandoffDb {
     }
 
     pub fn upsert(&self, project: &str, handoff: &Handoff, today: &str) -> Result<UpsertReport> {
-        let connection = self.open()?;
+        let mut connection = self.open()?;
         Self::init_schema(&connection)?;
+        let transaction = connection.transaction()?;
 
         let mut synced = 0usize;
         for item in &handoff.items {
-            connection.execute(
+            transaction.execute(
                 "INSERT INTO items (project, id, name, priority, status, completed, updated)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                  ON CONFLICT(project, id) DO UPDATE SET
@@ -80,6 +81,8 @@ impl HandoffDb {
             )?;
             synced += 1;
         }
+        Self::prune_missing_items(&transaction, project, handoff)?;
+        transaction.commit()?;
 
         Ok(UpsertReport {
             db_path: self.db_path.clone(),
@@ -148,6 +151,27 @@ impl HandoffDb {
                 PRIMARY KEY (project, id)
             );",
         )?;
+        Ok(())
+    }
+
+    fn prune_missing_items(
+        connection: &Connection,
+        project: &str,
+        handoff: &Handoff,
+    ) -> Result<()> {
+        if handoff.items.is_empty() {
+            connection.execute("DELETE FROM items WHERE project = ?1", params![project])?;
+            return Ok(());
+        }
+
+        let placeholders = std::iter::repeat_n("?", handoff.items.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!("DELETE FROM items WHERE project = ? AND id NOT IN ({placeholders})");
+        let params = std::iter::once(project.to_string())
+            .chain(handoff.items.iter().map(|item| item.id.clone()))
+            .collect::<Vec<_>>();
+        connection.execute(&sql, params_from_iter(params))?;
         Ok(())
     }
 
@@ -310,6 +334,97 @@ mod tests {
         assert_eq!(rows[0].status, "done");
         assert_eq!(rows[0].completed, "2026-04-18");
         assert_eq!(rows[0].updated, "2026-04-18");
+    }
+
+    #[test]
+    fn upsert_prunes_rows_removed_from_handoff() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let initial = Handoff {
+            items: vec![
+                HandoffItem {
+                    id: "hj-1".into(),
+                    priority: Some("P1".into()),
+                    status: Some("open".into()),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-2".into(),
+                    priority: Some("P2".into()),
+                    status: Some("open".into()),
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+        let updated = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-2".into(),
+                priority: Some("P2".into()),
+                status: Some("blocked".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &initial, "2026-04-16")
+            .expect("initial upsert");
+        db.upsert("hj", &updated, "2026-04-17")
+            .expect("updated upsert");
+
+        let rows = db.query("hj").expect("query");
+        assert_eq!(
+            rows,
+            vec![HandoffRow {
+                id: "hj-2".into(),
+                priority: "P2".into(),
+                status: "blocked".into(),
+                completed: String::new(),
+                updated: "2026-04-17".into(),
+            }]
+        );
+    }
+
+    #[test]
+    fn upsert_empty_handoff_prunes_only_target_project() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let initial = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                priority: Some("P1".into()),
+                status: Some("open".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+        let other_project = Handoff {
+            items: vec![HandoffItem {
+                id: "other-1".into(),
+                priority: Some("P2".into()),
+                status: Some("open".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &initial, "2026-04-16").expect("hj upsert");
+        db.upsert("other", &other_project, "2026-04-16")
+            .expect("other upsert");
+        db.upsert("hj", &Handoff::default(), "2026-04-17")
+            .expect("empty upsert");
+
+        assert!(db.query("hj").expect("hj query").is_empty());
+        assert_eq!(
+            db.query("other").expect("other query"),
+            vec![HandoffRow {
+                id: "other-1".into(),
+                priority: "P2".into(),
+                status: "open".into(),
+                completed: String::new(),
+                updated: "2026-04-16".into(),
+            }]
+        );
     }
 
     #[test]
