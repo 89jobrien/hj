@@ -1,22 +1,13 @@
 project: hj
 id: hj
 updated: "2026-04-16"
-items:
-  - id: hj-2
-    name: add-handup-survey-parity
-    priority: P2
-    status: open
-    title: Add handup survey parity for nested repo scans and checkpoint output
-    description: >
-      Implement the published handup survey behavior so hj can scan nested repos for
-      HANDOFF files and inline TODO markers, write HANDUP.json under ~/.ctx/handoffs/,
-      and checkpoint runs to the handup SQLite history expected by the atelier skills.
-    files:
-      - hj-cli/src/main.rs
-      - hj-git/src/lib.rs
-      - hj-sqlite/src/lib.rs
-    extra: []
+items: []
 log:
+  - date: "2026-04-16"
+    summary: >
+      Implemented handup survey parity in hj with nested HANDOFF and TODO scanning,
+      HANDUP.json output, and SQLite checkpoint history support.
+    commits: []
   - date: "2026-04-16"
     summary: >
       Shipped direct handoff command binaries for hj by adding installable
