@@ -17,7 +17,7 @@
 
 | Area | What it covers |
 |---|---|
-| Structured handoff state | YAML-backed `HANDOFF.*.yaml` plus per-project state files under `.ctx/` |
+| Structured handoff state | YAML-backed `HANDOFF.*.yaml` plus gitignored per-project session state files under `.ctx/` |
 | Repo discovery | Detect repo roots, infer project names, and migrate legacy root handoffs |
 | Handoff rendering | Render active items and recent log entries to `HANDOFF.md` |
 | Handup survey | Scan nested repos and TODO markers, emit `HANDUP.json`, and checkpoint the run |

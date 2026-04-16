@@ -287,7 +287,7 @@ fn build_state(
         build: build.or(existing.build).or(Some("unknown".into())),
         tests: tests.or(existing.tests).or(Some("unknown".into())),
         notes: notes.or(existing.notes),
-        touched_files: context.working_tree_files()?,
+        touched_files: Vec::new(),
         extra: existing.extra,
     })
 }

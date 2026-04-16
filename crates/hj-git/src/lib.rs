@@ -16,7 +16,6 @@ pub struct RepoContext {
     pub cwd: PathBuf,
     pub base_name: String,
 }
-
 #[derive(Debug, Clone)]
 pub struct HandoffPaths {
     pub repo_root: PathBuf,
@@ -170,33 +169,6 @@ impl RepoContext {
                 Ok(Some(target.to_path_buf()))
             }
         }
-    }
-
-    pub fn working_tree_files(&self) -> Result<Vec<String>> {
-        let output = git_output(
-            &self.repo_root,
-            ["status", "--short", "--untracked-files=all"],
-        )?;
-        let mut files = Vec::new();
-        for line in output.lines() {
-            if line.len() < 4 {
-                continue;
-            }
-            let raw = line[3..].trim();
-            if raw.is_empty() {
-                continue;
-            }
-            let file = raw
-                .split(" -> ")
-                .last()
-                .map(str::trim)
-                .unwrap_or(raw)
-                .to_string();
-            if !files.iter().any(|existing| existing == &file) {
-                files.push(file);
-            }
-        }
-        Ok(files)
     }
 }
 

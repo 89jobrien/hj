@@ -85,7 +85,7 @@ pub struct HandoffState {
     pub tests: Option<String>,
     #[serde(default)]
     pub notes: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub touched_files: Vec<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, serde_yaml::Value>,
@@ -369,8 +369,8 @@ fn contains_any(existing: &[String], item: &HandoffItem) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        Handoff, HandoffItem, ReconcileMode, TodoSnapshot, build_reconcile_plan, default_id_prefix,
-        infer_priority, sanitize_name, titleize_slug,
+        Handoff, HandoffItem, HandoffState, ReconcileMode, TodoSnapshot, build_reconcile_plan,
+        default_id_prefix, infer_priority, sanitize_name, titleize_slug,
     };
 
     #[test]
@@ -456,5 +456,18 @@ mod tests {
         assert_eq!(sync.report.captured_count, 2);
         assert_eq!(sync.report.created_count, 1);
         assert!(sync.report.not_captured.is_empty());
+    }
+
+    #[test]
+    fn state_omits_empty_touched_files() {
+        let state = HandoffState {
+            branch: Some("main".into()),
+            build: Some("clean".into()),
+            tests: Some("passing".into()),
+            ..HandoffState::default()
+        };
+
+        let rendered = serde_yaml::to_string(&state).expect("serialize state");
+        assert!(!rendered.contains("touched_files"));
     }
 }
