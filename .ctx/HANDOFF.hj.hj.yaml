@@ -1,8 +1,55 @@
 project: hj
 id: hj
 updated: "2026-04-16"
-items: []
+items:
+  - id: hj-3
+    name: handup-e2e
+    priority: P1
+    status: open
+    title: Verify handup end-to-end output paths
+    description: >
+      The handup CLI implementation builds and tests cleanly, but it still needs an
+      end-to-end run that writes HANDUP.json and a checkpoint under ~/.ctx/handoffs
+      to confirm the real output paths and summary rendering.
+    files:
+      - crates/hj-cli/src/main.rs
+      - crates/hj-cli/src/bin/handup.rs
+      - crates/hj-core/src/lib.rs
+      - crates/hj-git/src/lib.rs
+      - crates/hj-sqlite/src/lib.rs
+  - id: hj-5
+    name: refresh-cli-shims
+    priority: P1
+    status: open
+    title: Refresh installed handoff command shims
+    description: >
+      The repo-local target/debug/handoff-db binary reflects the new open items, but
+      the installed ~/.local/bin/handoff-db shim still reports only the old hj-1/hj-2
+      rows. Refresh the installed command shims so PATH matches the current workspace.
+    files:
+      - crates/hj-cli/Cargo.toml
+      - crates/hj-cli/src/bin/handoff-db.rs
+      - crates/hj-cli/src/bin/handoff-detect.rs
+      - crates/hj-cli/src/bin/handup.rs
+  - id: hj-4
+    name: handoff-db-prune
+    priority: P2
+    status: open
+    title: Prune stale SQLite handoff rows
+    description: >
+      handoff-db query still returns hj-2 as open even though the structured handoff
+      items list is empty. The upsert flow currently only inserts or updates rows, so
+      removed items are not cleared from SQLite.
+    files:
+      - crates/hj-cli/src/main.rs
+      - crates/hj-sqlite/src/lib.rs
 log:
+  - date: "2026-04-16"
+    summary: >
+      Validated the in-progress handup implementation with cargo check and cargo test,
+      then captured the remaining end-to-end verification, CLI shim refresh, and
+      SQLite pruning follow-ups in the structured handoff.
+    commits: []
   - date: "2026-04-16"
     summary: >
       Implemented handup survey parity in hj with nested HANDOFF and TODO scanning,

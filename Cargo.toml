@@ -1,11 +1,11 @@
 [workspace]
 members = [
-    "hj-cli",
-    "hj-core",
-    "hj-doob",
-    "hj-git",
-    "hj-render",
-    "hj-sqlite",
+    "crates/hj-cli",
+    "crates/hj-core",
+    "crates/hj-doob",
+    "crates/hj-git",
+    "crates/hj-render",
+    "crates/hj-sqlite",
 ]
 resolver = "2"
 

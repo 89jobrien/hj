@@ -253,11 +253,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "dirs",
  "hj-core",
  "hj-doob",
  "hj-git",
  "hj-render",
  "hj-sqlite",
+ "serde_json",
  "serde_yaml",
 ]
 

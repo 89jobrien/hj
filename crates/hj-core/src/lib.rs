@@ -91,6 +91,44 @@ pub struct HandoffState {
     pub extra: BTreeMap<String, serde_yaml::Value>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct HandupReport {
+    pub generated: String,
+    pub cwd: String,
+    #[serde(default)]
+    pub projects: Vec<HandupProject>,
+    pub recommendation: HandupRecommendation,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct HandupProject {
+    pub name: String,
+    pub path: String,
+    pub repo_root: String,
+    pub handoff_path: Option<String>,
+    pub branch: Option<String>,
+    pub build: Option<String>,
+    pub tests: Option<String>,
+    #[serde(default)]
+    pub items: Vec<HandupItem>,
+    #[serde(default)]
+    pub todos: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct HandupItem {
+    pub id: String,
+    pub priority: String,
+    pub status: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct HandupRecommendation {
+    pub project: Option<String>,
+    pub reason: String,
+}
+
 impl Handoff {
     pub fn active_items(&self) -> impl Iterator<Item = &HandoffItem> {
         self.items.iter().filter(|item| item.is_open_or_blocked())
@@ -149,6 +187,13 @@ impl HandoffItem {
 
         variants
     }
+
+    pub fn inferred_priority(&self) -> String {
+        self.priority
+            .clone()
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| infer_priority(self.title.as_str(), self.description.as_deref()))
+    }
 }
 
 pub fn sanitize_name(raw: &str) -> String {
@@ -178,9 +223,47 @@ pub fn titleize_slug(slug: &str) -> String {
         .join(" ")
 }
 
+pub fn infer_priority(title: &str, description: Option<&str>) -> String {
+    let title = title.to_ascii_lowercase();
+    let description = description.unwrap_or_default().to_ascii_lowercase();
+    let combined = format!("{title} {description}");
+
+    if [
+        "broken",
+        "fails",
+        "segfault",
+        "panic",
+        "security",
+        "blocked",
+        "urgent",
+        "can't deploy",
+    ]
+    .iter()
+    .any(|needle| combined.contains(needle))
+    {
+        return "P0".to_string();
+    }
+
+    if [
+        "fix",
+        "implement",
+        "refactor",
+        "wire",
+        "small change",
+        "known fix",
+    ]
+    .iter()
+    .any(|needle| combined.contains(needle))
+    {
+        return "P1".to_string();
+    }
+
+    "P2".to_string()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{HandoffItem, default_id_prefix, sanitize_name, titleize_slug};
+    use super::{HandoffItem, default_id_prefix, infer_priority, sanitize_name, titleize_slug};
 
     #[test]
     fn sanitize_project_name() {
@@ -205,5 +288,12 @@ mod tests {
 
         assert_eq!(titleize_slug("wire-render-pass"), "Wire Render Pass");
         assert_eq!(item.doob_title(), "Wire Render Pass [BLOCKED]");
+    }
+
+    #[test]
+    fn infer_priority_uses_signal_words() {
+        assert_eq!(infer_priority("CI broken", None), "P0");
+        assert_eq!(infer_priority("Implement handup parity", None), "P1");
+        assert_eq!(infer_priority("Explore someday", None), "P2");
     }
 }

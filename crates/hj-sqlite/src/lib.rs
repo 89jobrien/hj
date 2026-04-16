@@ -23,6 +23,19 @@ pub struct HandoffDb {
     db_path: PathBuf,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct HandupCheckpoint {
+    pub project: String,
+    pub cwd: String,
+    pub generated: String,
+    pub recommendation: String,
+    pub json_path: String,
+}
+
+pub struct HandupDb {
+    db_path: PathBuf,
+}
+
 impl HandoffDb {
     pub fn new() -> Result<Self> {
         let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
@@ -160,12 +173,71 @@ impl HandoffDb {
     }
 }
 
+impl HandupDb {
+    pub fn new() -> Result<Self> {
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
+        Ok(Self {
+            db_path: home.join(".ctx/handoffs/handup.db"),
+        })
+    }
+
+    #[cfg(test)]
+    pub fn with_path(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    pub fn checkpoint(&self, checkpoint: &HandupCheckpoint) -> Result<PathBuf> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+        connection.execute(
+            "INSERT INTO checkpoints (project, cwd, generated, recommendation, json_path)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                checkpoint.project,
+                checkpoint.cwd,
+                checkpoint.generated,
+                checkpoint.recommendation,
+                checkpoint.json_path
+            ],
+        )?;
+        Ok(self.db_path.clone())
+    }
+
+    fn open(&self) -> Result<Connection> {
+        let parent = self
+            .db_path
+            .parent()
+            .ok_or_else(|| anyhow!("database path has no parent directory"))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+
+        Connection::open(&self.db_path)
+            .with_context(|| format!("failed to open {}", self.db_path.display()))
+    }
+
+    fn init_schema(connection: &Connection) -> Result<()> {
+        connection.execute_batch(
+            "CREATE TABLE IF NOT EXISTS checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project TEXT NOT NULL,
+                cwd TEXT NOT NULL,
+                generated TEXT NOT NULL,
+                recommendation TEXT,
+                json_path TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );",
+        )?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use hj_core::{Handoff, HandoffItem};
+    use rusqlite::Connection;
     use tempfile::tempdir;
 
-    use super::{HandoffDb, HandoffRow};
+    use super::{HandoffDb, HandoffRow, HandupCheckpoint, HandupDb};
 
     #[test]
     fn query_returns_rows_in_priority_order() {
@@ -238,5 +310,27 @@ mod tests {
         assert_eq!(rows[0].status, "done");
         assert_eq!(rows[0].completed, "2026-04-18");
         assert_eq!(rows[0].updated, "2026-04-18");
+    }
+
+    #[test]
+    fn handup_checkpoint_persists_rows() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandupDb::with_path(tmp.path().join("handup.db"));
+        let checkpoint = HandupCheckpoint {
+            project: "hj".into(),
+            cwd: "/Users/joe/dev/hj".into(),
+            generated: "2026-04-16".into(),
+            recommendation: "Clean state".into(),
+            json_path: "/Users/joe/.ctx/handoffs/hj/HANDUP.json".into(),
+        };
+
+        let db_path = db.checkpoint(&checkpoint).expect("checkpoint");
+        assert!(db_path.ends_with("handup.db"));
+
+        let connection = Connection::open(db_path).expect("open db");
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM checkpoints", [], |row| row.get(0))
+            .expect("count");
+        assert_eq!(count, 1);
     }
 }

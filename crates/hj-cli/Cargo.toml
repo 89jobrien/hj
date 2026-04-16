@@ -15,12 +15,18 @@ path = "src/bin/handoff-detect.rs"
 name = "handoff-db"
 path = "src/bin/handoff-db.rs"
 
+[[bin]]
+name = "handup"
+path = "src/bin/handup.rs"
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+dirs.workspace = true
 hj-core = { path = "../hj-core" }
 hj-doob = { path = "../hj-doob" }
 hj-git = { path = "../hj-git" }
 hj-render = { path = "../hj-render" }
 hj-sqlite = { path = "../hj-sqlite" }
+serde_json.workspace = true
 serde_yaml.workspace = true
