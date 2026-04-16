@@ -2,11 +2,18 @@
 name = "hj-sqlite"
 version.workspace = true
 edition.workspace = true
+description = "SQLite backing stores for hj handoff workflows"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hj-sqlite"
+keywords = ["sqlite", "handoff", "workflow"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow.workspace = true
 dirs.workspace = true
-hj-core = { path = "../hj-core" }
+hj-core = { version = "0.1.1", path = "../hj-core" }
 rusqlite.workspace = true
 
 [dev-dependencies]

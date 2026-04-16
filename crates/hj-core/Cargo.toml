@@ -2,6 +2,13 @@
 name = "hj-core"
 version.workspace = true
 edition.workspace = true
+description = "Core data types for hj handoff workflows"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hj-core"
+keywords = ["handoff", "workflow", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 serde.workspace = true

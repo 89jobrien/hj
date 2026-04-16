@@ -2,6 +2,13 @@
 name = "hj-doob"
 version.workspace = true
 edition.workspace = true
+description = "Doob integration helpers for hj handoff workflows"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hj-doob"
+keywords = ["handoff", "doob", "workflow"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow.workspace = true

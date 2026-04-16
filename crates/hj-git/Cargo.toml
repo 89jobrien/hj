@@ -2,10 +2,17 @@
 name = "hj-git"
 version.workspace = true
 edition.workspace = true
+description = "Git and repo discovery utilities for hj handoff workflows"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hj-git"
+keywords = ["git", "handoff", "workflow"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow.workspace = true
-hj-core = { path = "../hj-core" }
+hj-core = { version = "0.1.1", path = "../hj-core" }
 serde_yaml.workspace = true
 toml.workspace = true
 walkdir.workspace = true

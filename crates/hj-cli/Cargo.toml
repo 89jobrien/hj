@@ -2,6 +2,13 @@
 name = "hj-cli"
 version.workspace = true
 edition.workspace = true
+description = "CLI for handoff state, reconciliation, and handup surveys"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hj-cli"
+keywords = ["cli", "handoff", "workflow"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "hj"
@@ -23,10 +30,10 @@ path = "src/bin/handup.rs"
 anyhow.workspace = true
 clap.workspace = true
 dirs.workspace = true
-hj-core = { path = "../hj-core" }
-hj-doob = { path = "../hj-doob" }
-hj-git = { path = "../hj-git" }
-hj-render = { path = "../hj-render" }
-hj-sqlite = { path = "../hj-sqlite" }
+hj-core = { version = "0.1.1", path = "../hj-core" }
+hj-doob = { version = "0.1.1", path = "../hj-doob" }
+hj-git = { version = "0.1.1", path = "../hj-git" }
+hj-render = { version = "0.1.1", path = "../hj-render" }
+hj-sqlite = { version = "0.1.1", path = "../hj-sqlite" }
 serde_json.workspace = true
 serde_yaml.workspace = true

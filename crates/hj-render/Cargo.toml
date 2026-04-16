@@ -2,6 +2,13 @@
 name = "hj-render"
 version.workspace = true
 edition.workspace = true
+description = "Markdown rendering for hj handoff workflows"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hj-render"
+keywords = ["handoff", "render", "markdown"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
-hj-core = { path = "../hj-core" }
+hj-core = { version = "0.1.1", path = "../hj-core" }
