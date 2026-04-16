@@ -1,0 +1,18 @@
+[package]
+name = "hj-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "hj"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+hj-core = { path = "../hj-core" }
+hj-doob = { path = "../hj-doob" }
+hj-git = { path = "../hj-git" }
+hj-render = { path = "../hj-render" }
+hj-sqlite = { path = "../hj-sqlite" }
+serde_yaml.workspace = true

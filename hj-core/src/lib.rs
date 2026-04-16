@@ -1,0 +1,209 @@
+use std::collections::BTreeMap;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Handoff {
+    #[serde(default)]
+    pub project: Option<String>,
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub updated: Option<String>,
+    #[serde(default)]
+    pub items: Vec<HandoffItem>,
+    #[serde(default)]
+    pub log: Vec<LogEntry>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_yaml::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HandoffItem {
+    pub id: String,
+    #[serde(default)]
+    pub doob_uuid: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub priority: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
+    #[serde(default)]
+    pub completed: Option<String>,
+    #[serde(default)]
+    pub extra: Vec<ExtraEntry>,
+    #[serde(flatten)]
+    pub extra_fields: BTreeMap<String, serde_yaml::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ExtraEntry {
+    #[serde(default)]
+    pub date: Option<String>,
+    #[serde(default)]
+    pub r#type: Option<String>,
+    #[serde(default)]
+    pub field: Option<String>,
+    #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
+    pub reviewed: Option<String>,
+    #[serde(default)]
+    pub note: Option<String>,
+    #[serde(flatten)]
+    pub extra_fields: BTreeMap<String, serde_yaml::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LogEntry {
+    #[serde(default)]
+    pub date: Option<String>,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub commits: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_yaml::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct HandoffState {
+    #[serde(default)]
+    pub updated: Option<String>,
+    #[serde(default)]
+    pub branch: Option<String>,
+    #[serde(default)]
+    pub build: Option<String>,
+    #[serde(default)]
+    pub tests: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub touched_files: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_yaml::Value>,
+}
+
+impl Handoff {
+    pub fn active_items(&self) -> impl Iterator<Item = &HandoffItem> {
+        self.items.iter().filter(|item| item.is_open_or_blocked())
+    }
+
+    pub fn ensure_project(&mut self, project: &str) {
+        if self.project.as_deref().unwrap_or_default().is_empty() {
+            self.project = Some(project.to_string());
+        }
+    }
+
+    pub fn ensure_id_prefix(&mut self, project: &str) {
+        if self.id.as_deref().unwrap_or_default().is_empty() {
+            self.id = Some(default_id_prefix(project));
+        }
+    }
+}
+
+impl HandoffItem {
+    pub fn is_open_or_blocked(&self) -> bool {
+        matches!(self.status.as_deref(), Some("open" | "blocked"))
+    }
+
+    pub fn doob_title(&self) -> String {
+        let base = self
+            .name
+            .as_deref()
+            .filter(|value| !value.is_empty() && *value != "null")
+            .map(titleize_slug)
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| self.title.clone());
+
+        if self.status.as_deref() == Some("blocked") {
+            format!("{base} [BLOCKED]")
+        } else {
+            base
+        }
+    }
+
+    pub fn title_variants(&self) -> Vec<String> {
+        let mut variants = Vec::new();
+        let title = self.title.clone();
+        let blocked_title = format!("{title} [BLOCKED]");
+        let doob_title = self.doob_title();
+        let blocked_doob_title = if doob_title.ends_with(" [BLOCKED]") {
+            doob_title.clone()
+        } else {
+            format!("{doob_title} [BLOCKED]")
+        };
+
+        for value in [title, blocked_title, doob_title, blocked_doob_title] {
+            if !value.is_empty() && !variants.iter().any(|existing| existing == &value) {
+                variants.push(value);
+            }
+        }
+
+        variants
+    }
+}
+
+pub fn sanitize_name(raw: &str) -> String {
+    raw.trim().to_ascii_lowercase().replace([' ', '/'], "-")
+}
+
+pub fn default_id_prefix(project: &str) -> String {
+    let cleaned = sanitize_name(project);
+    cleaned.chars().take(7).collect()
+}
+
+pub fn titleize_slug(slug: &str) -> String {
+    slug.split('-')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => {
+                    let mut word = first.to_uppercase().collect::<String>();
+                    word.push_str(chars.as_str());
+                    word
+                }
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{HandoffItem, default_id_prefix, sanitize_name, titleize_slug};
+
+    #[test]
+    fn sanitize_project_name() {
+        assert_eq!(sanitize_name("My Project/CLI"), "my-project-cli");
+    }
+
+    #[test]
+    fn default_prefix_uses_first_seven_chars() {
+        assert_eq!(default_id_prefix("atelier"), "atelier");
+        assert_eq!(default_id_prefix("sanctum"), "sanctum");
+    }
+
+    #[test]
+    fn doob_title_prefers_slug() {
+        let item = HandoffItem {
+            id: "x-1".into(),
+            name: Some("wire-render-pass".into()),
+            status: Some("blocked".into()),
+            title: "ignored".into(),
+            ..HandoffItem::default()
+        };
+
+        assert_eq!(titleize_slug("wire-render-pass"), "Wire Render Pass");
+        assert_eq!(item.doob_title(), "Wire Render Pass [BLOCKED]");
+    }
+}

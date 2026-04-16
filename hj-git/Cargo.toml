@@ -1,0 +1,14 @@
+[package]
+name = "hj-git"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+hj-core = { path = "../hj-core" }
+serde_yaml.workspace = true
+toml.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

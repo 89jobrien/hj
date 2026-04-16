@@ -1,0 +1,7 @@
+[package]
+name = "hj-render"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+hj-core = { path = "../hj-core" }
