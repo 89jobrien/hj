@@ -565,6 +565,8 @@ fn write_gitignore_block(repo_root: &Path) -> Result<()> {
         "!.ctx/HANDOFF.*.yaml",
         ".ctx/HANDOFF.*.state.yaml",
         "!.ctx/handoff.*.config.toml.example",
+        ".ctx/HANDOFF.*.*.state.yaml",
+        ".ctx/HANDOFF.hj.hj.state.yaml",
         ".ctx/.initialized",
         "# handoff-end",
     ];
@@ -664,6 +666,8 @@ mod tests {
         let updated = fs::read_to_string(gitignore).unwrap();
 
         assert!(updated.contains(".ctx/*"));
+        assert!(updated.contains(".ctx/HANDOFF.*.*.state.yaml"));
+        assert!(updated.contains(".ctx/HANDOFF.hj.hj.state.yaml"));
         assert!(updated.contains("target/"));
         assert!(updated.contains("node_modules/"));
         assert!(!updated.contains("\nold\n"));
