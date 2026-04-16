@@ -318,8 +318,7 @@ fn load_target_handoff(
             .with_context(|| format!("failed to read {}", handoff_path.display()))?;
         let handoff: Handoff = serde_yaml::from_str(&contents)
             .with_context(|| format!("failed to parse {}", handoff_path.display()))?;
-        let mut resolved = paths;
-        resolved.handoff_path = handoff_path;
+        let resolved = rebind_paths_for_handoff(paths, &handoff_path, &handoff)?;
         return Ok((resolved, handoff));
     }
 
@@ -328,8 +327,7 @@ fn load_target_handoff(
             .with_context(|| format!("failed to read {}", migrated.display()))?;
         let handoff: Handoff = serde_yaml::from_str(&contents)
             .with_context(|| format!("failed to parse {}", migrated.display()))?;
-        let mut resolved = paths;
-        resolved.handoff_path = migrated;
+        let resolved = rebind_paths_for_handoff(paths, &migrated, &handoff)?;
         return Ok((resolved, handoff));
     }
 
@@ -344,6 +342,54 @@ fn load_target_handoff(
     }
 
     bail!("handoff file not found: {}", handoff_path.display())
+}
+
+fn rebind_paths_for_handoff(
+    mut paths: hj_git::HandoffPaths,
+    handoff_path: &Path,
+    handoff: &Handoff,
+) -> Result<hj_git::HandoffPaths> {
+    let ctx_dir = handoff_path
+        .parent()
+        .ok_or_else(|| anyhow!("handoff path has no parent directory"))?
+        .to_path_buf();
+    let project = handoff
+        .project
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| project_from_handoff_path(handoff_path, &paths.base_name))
+        .unwrap_or(paths.project.clone());
+
+    paths.ctx_dir = ctx_dir.clone();
+    paths.handoff_path = handoff_path.to_path_buf();
+    paths.state_path = state_path_for_handoff(handoff_path)?;
+    paths.rendered_path = ctx_dir.join("HANDOFF.md");
+    paths.handover_path = ctx_dir.join("HANDOVER.md");
+    paths.project = project;
+    Ok(paths)
+}
+
+fn state_path_for_handoff(handoff_path: &Path) -> Result<std::path::PathBuf> {
+    let file_name = handoff_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| anyhow!("handoff path has no filename"))?;
+    let stem = file_name
+        .strip_suffix(".yaml")
+        .ok_or_else(|| anyhow!("handoff path must end with .yaml"))?;
+    Ok(handoff_path.with_file_name(format!("{stem}.state.yaml")))
+}
+
+fn project_from_handoff_path(handoff_path: &Path, base_name: &str) -> Option<String> {
+    let file_name = handoff_path.file_name()?.to_str()?;
+    let prefix = "HANDOFF.";
+    let suffix = format!(".{base_name}.yaml");
+    file_name
+        .strip_prefix(prefix)?
+        .strip_suffix(&suffix)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn reconcile_handoff(
@@ -514,10 +560,15 @@ fn print_list(label: &str, items: &[String]) {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use hj_core::{ExtraEntry, Handoff, HandoffItem};
     use hj_sqlite::HandoffRow;
 
-    use super::{apply_handoff_rows, collect_review_on_wake};
+    use super::{
+        apply_handoff_rows, collect_review_on_wake, project_from_handoff_path,
+        rebind_paths_for_handoff,
+    };
 
     #[test]
     fn sqlite_rows_override_handoff_status() {
@@ -569,5 +620,42 @@ mod tests {
         assert_eq!(review.len(), 2);
         assert!(review[0].contains("[hj-1]"));
         assert!(review[1].contains("Needs confirmation."));
+    }
+
+    #[test]
+    fn explicit_handoff_path_rebinds_state_and_project() {
+        let paths = hj_git::HandoffPaths {
+            repo_root: PathBuf::from("/repo"),
+            ctx_dir: PathBuf::from("/repo/.ctx"),
+            handoff_path: PathBuf::from("/repo/.ctx/HANDOFF.hj.hj.yaml"),
+            state_path: PathBuf::from("/repo/.ctx/HANDOFF.hj.hj.state.yaml"),
+            rendered_path: PathBuf::from("/repo/.ctx/HANDOFF.md"),
+            handover_path: PathBuf::from("/repo/.ctx/HANDOVER.md"),
+            project: "hj".into(),
+            base_name: "hj".into(),
+        };
+        let explicit = PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.yaml");
+        let handoff = Handoff {
+            project: Some("hj-core".into()),
+            ..Handoff::default()
+        };
+
+        let rebound = rebind_paths_for_handoff(paths, &explicit, &handoff).unwrap();
+
+        assert_eq!(rebound.project, "hj-core");
+        assert_eq!(rebound.handoff_path, explicit);
+        assert_eq!(
+            rebound.state_path,
+            PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.state.yaml")
+        );
+    }
+
+    #[test]
+    fn project_can_be_derived_from_handoff_filename() {
+        let handoff_path = PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.yaml");
+        assert_eq!(
+            project_from_handoff_path(&handoff_path, "hj").as_deref(),
+            Some("hj-core")
+        );
     }
 }
