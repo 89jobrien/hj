@@ -5,5 +5,7 @@
 !.ctx/HANDOFF.*.yaml
 .ctx/HANDOFF.*.state.yaml
 !.ctx/handoff.*.config.toml.example
+.ctx/HANDOFF.*.*.state.yaml
+.ctx/HANDOFF.hj.hj.state.yaml
 .ctx/.initialized
 # handoff-end

@@ -3,7 +3,7 @@ use std::{
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
-    process,
+    process::{self, Command},
 };
 
 use anyhow::{Context, Result, anyhow, bail};
@@ -35,6 +35,9 @@ enum Commands {
     Detect(DetectArgs),
     HandoffDb(DbArgs),
     Handup(HandupArgs),
+    Install(InstallArgs),
+    Update(UpdateArgs),
+    UpdateAll(UpdateArgs),
     Refresh(RefreshArgs),
     Reconcile(TargetArgs),
     Audit(TargetArgs),
@@ -57,6 +60,18 @@ struct DetectArgs {
 struct RefreshArgs {
     #[arg(long)]
     force: bool,
+}
+
+#[derive(Debug, Args)]
+struct InstallArgs {
+    #[arg(long, default_value = "~/.local")]
+    root: String,
+}
+
+#[derive(Debug, Args, Clone)]
+struct UpdateArgs {
+    #[arg(long, default_value = "~/.local")]
+    root: String,
 }
 
 #[derive(Debug, Args)]
@@ -153,6 +168,8 @@ fn run() -> Result<()> {
         Commands::Detect(args) => detect(args),
         Commands::HandoffDb(args) => handoff_db(args),
         Commands::Handup(args) => handup(args),
+        Commands::Install(args) => install(args),
+        Commands::Update(args) | Commands::UpdateAll(args) => update(args),
         Commands::Refresh(args) => refresh(args),
         Commands::Reconcile(args) => reconcile(args, Mode::Sync),
         Commands::Audit(args) => reconcile(args, Mode::Audit),
@@ -236,6 +253,75 @@ fn refresh(args: RefreshArgs) -> Result<()> {
         report.packages.join(", ")
     );
     Ok(())
+}
+
+fn install(args: InstallArgs) -> Result<()> {
+    let context = discover(Path::new("."))?;
+    let root = expand_home(&args.root)?;
+    run_cargo_install(
+        &[
+            "install",
+            "--path",
+            "crates/hj-cli",
+            "--bins",
+            "--force",
+            "--root",
+        ],
+        &[root.as_os_str()],
+        Some(&context.repo_root),
+    )?;
+    print_install_summary("Installed", &root);
+    Ok(())
+}
+
+fn update(args: UpdateArgs) -> Result<()> {
+    let root = expand_home(&args.root)?;
+    run_cargo_install(
+        &[
+            "install", "hj-cli", "--bins", "--locked", "--force", "--root",
+        ],
+        &[root.as_os_str()],
+        None,
+    )?;
+    print_install_summary("Updated", &root);
+    Ok(())
+}
+
+fn expand_home(value: &str) -> Result<PathBuf> {
+    if value == "~/.local" {
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
+        return Ok(home.join(".local"));
+    }
+    Ok(PathBuf::from(value))
+}
+
+fn run_cargo_install(
+    prefix_args: &[&str],
+    extra_args: &[&std::ffi::OsStr],
+    cwd: Option<&Path>,
+) -> Result<()> {
+    let mut command = Command::new("cargo");
+    command.env_remove("RUSTC_WRAPPER");
+    command.args(prefix_args);
+    command.args(extra_args);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+
+    let status = command
+        .status()
+        .context("failed to run cargo install/update")?;
+    if !status.success() {
+        bail!("cargo install failed with status {status}");
+    }
+    Ok(())
+}
+
+fn print_install_summary(action: &str, root: &Path) {
+    println!(
+        "{action} hj, handup, handoff-db, and handoff-detect into {}",
+        root.join("bin").display()
+    );
 }
 
 fn handoff_db(args: DbArgs) -> Result<()> {
@@ -839,5 +925,57 @@ fn print_list(label: &str, items: &[String]) {
     println!("{label}");
     for item in items {
         println!("- {item}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::{OsStr, OsString};
+
+    use clap::Parser;
+
+    use super::{Cli, Commands, InstallArgs, UpdateArgs, rewrite_args_for_alias};
+
+    #[test]
+    fn handoff_detect_alias_rewrites_to_subcommand() {
+        let rewritten = rewrite_args_for_alias([
+            OsString::from("handoff-detect"),
+            OsString::from("--project"),
+        ]);
+        assert_eq!(
+            rewritten,
+            vec![
+                OsString::from("hj"),
+                OsString::from("detect"),
+                OsString::from("--project")
+            ]
+        );
+    }
+
+    #[test]
+    fn install_command_uses_default_root() {
+        let cli = Cli::parse_from([OsStr::new("hj"), OsStr::new("install")]);
+        match cli.command {
+            Commands::Install(InstallArgs { root }) => assert_eq!(root, "~/.local"),
+            other => panic!("expected install command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn update_command_uses_default_root() {
+        let cli = Cli::parse_from([OsStr::new("hj"), OsStr::new("update")]);
+        match cli.command {
+            Commands::Update(UpdateArgs { root }) => assert_eq!(root, "~/.local"),
+            other => panic!("expected update command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn update_all_command_parses_separately() {
+        let cli = Cli::parse_from([OsStr::new("hj"), OsStr::new("update-all")]);
+        match cli.command {
+            Commands::UpdateAll(UpdateArgs { root }) => assert_eq!(root, "~/.local"),
+            other => panic!("expected update-all command, got {other:?}"),
+        }
     }
 }
