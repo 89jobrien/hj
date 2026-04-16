@@ -1,0 +1,25 @@
+project: hj
+id: hj
+updated: "2026-04-16"
+items:
+  - id: hj-1
+    name: ship-handoff-command-parity
+    priority: P1
+    status: open
+    title: Ship compatibility shims for skill-facing handoff commands
+    description: >
+      Implement the published handoff command surface so the atelier handoff skills can
+      target hj-backed commands and helper scripts directly. Start with the compatibility
+      shim path and handup/handoff-db parity tracked in GitHub issues #12, #9, and #14.
+    files:
+      - hj-cli/src/main.rs
+      - hj-git/src/lib.rs
+      - hj-sqlite/src/lib.rs
+    extra: []
+log:
+  - date: "2026-04-16"
+    summary: >
+      Bootstrapped the hj workspace, published it to GitHub, and captured the first
+      handoff with a concrete command-parity next step.
+    commits:
+      - 854d1df
