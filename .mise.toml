@@ -1,0 +1,62 @@
+[tools]
+rust = "1.91.1"
+python = "3.13"
+"cargo:cargo-edit" = "latest"
+"cargo:cargo-nextest" = "latest"
+
+[env]
+RUSTC_WRAPPER = ""
+RUST_BACKTRACE = "1"
+
+[tasks."fmt:check"]
+description = "Check formatting without modifying files"
+run = "cargo fmt --all --check"
+
+[tasks.clippy]
+description = "Run clippy across the workspace with warnings denied"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks.test]
+description = "Run the workspace test suite"
+run = "cargo test --workspace"
+
+[tasks.check]
+description = "Run cargo check across the workspace"
+run = "cargo check --workspace"
+
+[tasks.ci]
+description = "Run the local validation gate"
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo test --workspace",
+  "cargo check --workspace",
+]
+
+[tasks."release:check"]
+description = "Run the release preflight gate with nextest"
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets -- -D warnings",
+  "cargo nextest run --workspace",
+  "cargo check --workspace",
+]
+
+[tasks.install]
+description = "Install hj binaries from the current checkout into ~/.local"
+run = "cargo install --path crates/hj-cli --bins --force --root ~/.local"
+
+[tasks."examples:commands"]
+description = "Run all command demos from the examples directory"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+for script in ./examples/commands/*.sh; do
+  echo "==> $script"
+  "$script"
+done
+"""
+
+[tasks."examples:visual"]
+description = "Generate the standalone visual demo"
+run = "./examples/visual-demo.sh"
