@@ -7,6 +7,14 @@ edition.workspace = true
 name = "hj"
 path = "src/main.rs"
 
+[[bin]]
+name = "handoff-detect"
+path = "src/bin/handoff-detect.rs"
+
+[[bin]]
+name = "handoff-db"
+path = "src/bin/handoff-db.rs"
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

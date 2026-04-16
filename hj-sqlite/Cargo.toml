@@ -8,3 +8,6 @@ anyhow.workspace = true
 dirs.workspace = true
 hj-core = { path = "../hj-core" }
 rusqlite.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

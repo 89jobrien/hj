@@ -1,5 +1,6 @@
 use std::{
     collections::BTreeSet,
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
     process,
@@ -26,6 +27,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     Detect(DetectArgs),
+    HandoffDb(DbArgs),
     Refresh(RefreshArgs),
     Reconcile(TargetArgs),
     Audit(TargetArgs),
@@ -48,6 +50,53 @@ struct DetectArgs {
 struct RefreshArgs {
     #[arg(long)]
     force: bool,
+}
+
+#[derive(Debug, Args)]
+struct DbArgs {
+    #[command(subcommand)]
+    command: DbCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum DbCommand {
+    Init,
+    Upsert(DbUpsertArgs),
+    Query(DbProjectArgs),
+    Complete(DbItemArgs),
+    Status(DbStatusArgs),
+}
+
+#[derive(Debug, Args)]
+struct DbProjectArgs {
+    #[arg(long)]
+    project: String,
+}
+
+#[derive(Debug, Args)]
+struct DbUpsertArgs {
+    #[arg(long)]
+    project: String,
+    #[arg(long)]
+    handoff: PathBuf,
+}
+
+#[derive(Debug, Args)]
+struct DbItemArgs {
+    #[arg(long)]
+    project: String,
+    #[arg(long)]
+    id: String,
+}
+
+#[derive(Debug, Args)]
+struct DbStatusArgs {
+    #[arg(long)]
+    project: String,
+    #[arg(long)]
+    id: String,
+    #[arg(long)]
+    status: String,
 }
 
 #[derive(Debug, Args, Clone)]
@@ -86,14 +135,42 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let cli = Cli::parse();
+    let cli = Cli::parse_from(rewrite_args_for_alias(std::env::args_os()));
     match cli.command {
         Commands::Detect(args) => detect(args),
+        Commands::HandoffDb(args) => handoff_db(args),
         Commands::Refresh(args) => refresh(args),
         Commands::Reconcile(args) => reconcile(args, Mode::Sync),
         Commands::Audit(args) => reconcile(args, Mode::Audit),
         Commands::Close(args) => close(args),
     }
+}
+
+fn rewrite_args_for_alias(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {
+    let args = args.into_iter().collect::<Vec<_>>();
+    let Some(program) = args.first() else {
+        return vec![OsString::from("hj")];
+    };
+    let Some(name) = Path::new(program)
+        .file_name()
+        .and_then(|value| value.to_str())
+    else {
+        return args;
+    };
+
+    let subcommand = match name {
+        "handoff-detect" => Some("detect"),
+        "handoff-db" => Some("handoff-db"),
+        _ => None,
+    };
+
+    let Some(subcommand) = subcommand else {
+        return args;
+    };
+
+    let mut rewritten = vec![OsString::from("hj"), OsString::from(subcommand)];
+    rewritten.extend(args.into_iter().skip(1));
+    rewritten
 }
 
 fn detect(args: DetectArgs) -> Result<()> {
@@ -143,6 +220,50 @@ fn refresh(args: RefreshArgs) -> Result<()> {
         report.ctx_dir.display(),
         report.packages.join(", ")
     );
+    Ok(())
+}
+
+fn handoff_db(args: DbArgs) -> Result<()> {
+    let db = HandoffDb::new()?;
+    match args.command {
+        DbCommand::Init => {
+            let db_path = db.init()?;
+            println!("db initialized: {}", db_path.display());
+        }
+        DbCommand::Upsert(args) => {
+            let contents = fs::read_to_string(&args.handoff)
+                .with_context(|| format!("failed to read {}", args.handoff.display()))?;
+            let handoff: Handoff = serde_yaml::from_str(&contents)
+                .with_context(|| format!("failed to parse {}", args.handoff.display()))?;
+            let today = today(Path::new("."))?;
+            let report = db.upsert(&args.project, &handoff, &today)?;
+            println!(
+                "synced {} item(s) for project '{}'",
+                report.synced, args.project
+            );
+        }
+        DbCommand::Query(args) => {
+            for row in db.query(&args.project)? {
+                println!(
+                    "{}|{}|{}|{}|{}",
+                    row.id, row.priority, row.status, row.completed, row.updated
+                );
+            }
+        }
+        DbCommand::Complete(args) => {
+            let today = today(Path::new("."))?;
+            db.complete(&args.project, &args.id, &today)?;
+            println!("marked done: {}/{}", args.project, args.id);
+        }
+        DbCommand::Status(args) => {
+            let today = today(Path::new("."))?;
+            db.set_status(&args.project, &args.id, &args.status, &today)?;
+            println!(
+                "status updated: {}/{} → {}",
+                args.project, args.id, args.status
+            );
+        }
+    }
     Ok(())
 }
 

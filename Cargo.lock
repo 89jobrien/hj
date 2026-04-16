@@ -305,6 +305,7 @@ dependencies = [
  "dirs",
  "hj-core",
  "rusqlite",
+ "tempfile",
 ]
 
 [[package]]

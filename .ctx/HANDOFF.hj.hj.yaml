@@ -2,21 +2,26 @@ project: hj
 id: hj
 updated: "2026-04-16"
 items:
-  - id: hj-1
-    name: ship-handoff-command-parity
-    priority: P1
+  - id: hj-2
+    name: add-handup-survey-parity
+    priority: P2
     status: open
-    title: Ship compatibility shims for skill-facing handoff commands
+    title: Add handup survey parity for nested repo scans and checkpoint output
     description: >
-      Implement the published handoff command surface so the atelier handoff skills can
-      target hj-backed commands and helper scripts directly. Start with the compatibility
-      shim path and handup/handoff-db parity tracked in GitHub issues #12, #9, and #14.
+      Implement the published handup survey behavior so hj can scan nested repos for
+      HANDOFF files and inline TODO markers, write HANDUP.json under ~/.ctx/handoffs/,
+      and checkpoint runs to the handup SQLite history expected by the atelier skills.
     files:
       - hj-cli/src/main.rs
       - hj-git/src/lib.rs
       - hj-sqlite/src/lib.rs
     extra: []
 log:
+  - date: "2026-04-16"
+    summary: >
+      Shipped direct handoff command binaries for hj by adding installable
+      handoff-detect and handoff-db entrypoints plus SQLite query/status parity.
+    commits: []
   - date: "2026-04-16"
     summary: >
       Bootstrapped the hj workspace, published it to GitHub, and captured the first
