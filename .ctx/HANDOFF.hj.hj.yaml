@@ -4,6 +4,10 @@ updated: 2026-04-16
 items: []
 log:
 - date: 2026-04-16
+  summary: |
+    Moved reconcile planning into hj-core so the handoff flow can target any todo backend, updated hj-doob to expose backend snapshots, and added runnable command demos plus docs for the example flows.
+  commits: []
+- date: 2026-04-16
   summary: Split hj-cli into library modules with thin binary entrypoints
   commits:
   - 6e2c922

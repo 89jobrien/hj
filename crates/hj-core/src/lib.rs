@@ -129,6 +129,40 @@ pub struct HandupRecommendation {
     pub reason: String,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ReconcileMode {
+    Sync,
+    Audit,
+}
+
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub struct ReconcileReport {
+    pub project: String,
+    pub captured_count: usize,
+    pub created_count: usize,
+    pub not_captured: Vec<String>,
+    pub orphaned: Vec<String>,
+    pub closed_upstream: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub struct TodoSnapshot {
+    pub active_titles: Vec<String>,
+    pub closed_titles: Vec<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ReconcileCreate {
+    pub title: String,
+    pub priority: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub struct ReconcilePlan {
+    pub creates: Vec<ReconcileCreate>,
+    pub report: ReconcileReport,
+}
+
 impl Handoff {
     pub fn active_items(&self) -> impl Iterator<Item = &HandoffItem> {
         self.items.iter().filter(|item| item.is_open_or_blocked())
@@ -152,7 +186,7 @@ impl HandoffItem {
         matches!(self.status.as_deref(), Some("open" | "blocked"))
     }
 
-    pub fn doob_title(&self) -> String {
+    pub fn todo_title(&self) -> String {
         let base = self
             .name
             .as_deref()
@@ -168,18 +202,22 @@ impl HandoffItem {
         }
     }
 
+    pub fn doob_title(&self) -> String {
+        self.todo_title()
+    }
+
     pub fn title_variants(&self) -> Vec<String> {
         let mut variants = Vec::new();
         let title = self.title.clone();
         let blocked_title = format!("{title} [BLOCKED]");
-        let doob_title = self.doob_title();
-        let blocked_doob_title = if doob_title.ends_with(" [BLOCKED]") {
-            doob_title.clone()
+        let todo_title = self.todo_title();
+        let blocked_todo_title = if todo_title.ends_with(" [BLOCKED]") {
+            todo_title.clone()
         } else {
-            format!("{doob_title} [BLOCKED]")
+            format!("{todo_title} [BLOCKED]")
         };
 
-        for value in [title, blocked_title, doob_title, blocked_doob_title] {
+        for value in [title, blocked_title, todo_title, blocked_todo_title] {
             if !value.is_empty() && !variants.iter().any(|existing| existing == &value) {
                 variants.push(value);
             }
@@ -261,9 +299,79 @@ pub fn infer_priority(title: &str, description: Option<&str>) -> String {
     "P2".to_string()
 }
 
+pub fn build_reconcile_plan(
+    project: &str,
+    handoff: &Handoff,
+    snapshot: &TodoSnapshot,
+    mode: ReconcileMode,
+) -> ReconcilePlan {
+    let mut captured_count = 0usize;
+    let mut created_count = 0usize;
+    let mut not_captured = Vec::new();
+    let mut closed_upstream = Vec::new();
+    let mut creates = Vec::new();
+    let mut handoff_titles = std::collections::BTreeSet::new();
+
+    for item in handoff.active_items() {
+        for variant in item.title_variants() {
+            handoff_titles.insert(variant);
+        }
+
+        if contains_any(&snapshot.active_titles, item) {
+            captured_count += 1;
+            continue;
+        }
+
+        if contains_any(&snapshot.closed_titles, item) {
+            closed_upstream.push(item.todo_title());
+            continue;
+        }
+
+        match mode {
+            ReconcileMode::Sync => {
+                creates.push(ReconcileCreate {
+                    title: item.todo_title(),
+                    priority: item.priority.clone(),
+                });
+                captured_count += 1;
+                created_count += 1;
+            }
+            ReconcileMode::Audit => not_captured.push(item.todo_title()),
+        }
+    }
+
+    let orphaned = snapshot
+        .active_titles
+        .iter()
+        .filter(|title| !handoff_titles.contains(*title))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    ReconcilePlan {
+        creates,
+        report: ReconcileReport {
+            project: project.to_string(),
+            captured_count,
+            created_count,
+            not_captured,
+            orphaned,
+            closed_upstream,
+        },
+    }
+}
+
+fn contains_any(existing: &[String], item: &HandoffItem) -> bool {
+    item.title_variants()
+        .into_iter()
+        .any(|variant| existing.iter().any(|title| title == &variant))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{HandoffItem, default_id_prefix, infer_priority, sanitize_name, titleize_slug};
+    use super::{
+        Handoff, HandoffItem, ReconcileMode, TodoSnapshot, build_reconcile_plan, default_id_prefix,
+        infer_priority, sanitize_name, titleize_slug,
+    };
 
     #[test]
     fn sanitize_project_name() {
@@ -295,5 +403,58 @@ mod tests {
         assert_eq!(infer_priority("CI broken", None), "P0");
         assert_eq!(infer_priority("Implement handup parity", None), "P1");
         assert_eq!(infer_priority("Explore someday", None), "P2");
+    }
+
+    #[test]
+    fn reconcile_plan_is_backend_agnostic() {
+        let handoff = Handoff {
+            project: Some("hj".into()),
+            items: vec![
+                HandoffItem {
+                    id: "hj-1".into(),
+                    priority: Some("P1".into()),
+                    status: Some("open".into()),
+                    title: "Already tracked".into(),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-2".into(),
+                    priority: Some("P2".into()),
+                    status: Some("open".into()),
+                    title: "Needs create".into(),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-3".into(),
+                    priority: Some("P1".into()),
+                    status: Some("blocked".into()),
+                    title: "Closed upstream".into(),
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+        let snapshot = TodoSnapshot {
+            active_titles: vec!["Already tracked".into(), "Orphaned task".into()],
+            closed_titles: vec!["Closed upstream [BLOCKED]".into()],
+        };
+
+        let audit = build_reconcile_plan("hj", &handoff, &snapshot, ReconcileMode::Audit);
+        assert_eq!(audit.creates.len(), 0);
+        assert_eq!(audit.report.captured_count, 1);
+        assert_eq!(audit.report.not_captured, vec!["Needs create".to_string()]);
+        assert_eq!(
+            audit.report.closed_upstream,
+            vec!["Closed upstream [BLOCKED]".to_string()]
+        );
+        assert_eq!(audit.report.orphaned, vec!["Orphaned task".to_string()]);
+
+        let sync = build_reconcile_plan("hj", &handoff, &snapshot, ReconcileMode::Sync);
+        assert_eq!(sync.creates.len(), 1);
+        assert_eq!(sync.creates[0].title, "Needs create");
+        assert_eq!(sync.creates[0].priority.as_deref(), Some("P2"));
+        assert_eq!(sync.report.captured_count, 2);
+        assert_eq!(sync.report.created_count, 1);
+        assert!(sync.report.not_captured.is_empty());
     }
 }

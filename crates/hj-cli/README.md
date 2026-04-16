@@ -68,3 +68,4 @@ hj close
 - `hj install` uses the current checkout and should be run from an `hj` repository.
 - `hj update` installs the latest published `hj-cli` package.
 - `handoff`, `handon`, `handover`, `handoff-detect`, `handoff-db`, and `handup` are thin aliases that route into `hj`.
+- Runnable demos for the command surface live in [`../../examples/README.md`](../../examples/README.md).

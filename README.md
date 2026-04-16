@@ -151,6 +151,19 @@ hj handover
 handover
 ```
 
+## Examples
+
+Runnable command demos live under [`examples/`](./examples/README.md).
+
+```bash
+./examples/commands/01-detect.sh
+./examples/commands/03-handoff.sh
+./examples/commands/07-handup.sh
+./examples/visual-demo.sh
+```
+
+The examples use disposable temp repos and an isolated `HOME`, so they do not touch your real handoff DB or `~/.local`.
+
 ## Development
 
 Run the standard Rust checks from the workspace root:

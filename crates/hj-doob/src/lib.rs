@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, path::Path, process::Command};
 
 use anyhow::{Context, Result, bail};
+use hj_core::TodoSnapshot;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -25,16 +26,6 @@ impl TodoStatus {
 #[derive(Debug, Clone)]
 pub struct DoobClient {
     cwd: std::path::PathBuf,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ReconcileReport {
-    pub project: String,
-    pub captured_count: usize,
-    pub created_count: usize,
-    pub not_captured: Vec<String>,
-    pub orphaned: Vec<String>,
-    pub closed_upstream: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -81,6 +72,23 @@ impl DoobClient {
             .map(|todo| todo.content)
             .filter(|content| !content.is_empty())
             .collect())
+    }
+
+    pub fn snapshot(&self, project: &str) -> Result<TodoSnapshot> {
+        Ok(TodoSnapshot {
+            active_titles: unique_titles(
+                self.list_titles(project, TodoStatus::Pending)?
+                    .into_iter()
+                    .chain(self.list_titles(project, TodoStatus::InProgress)?)
+                    .collect::<Vec<_>>(),
+            ),
+            closed_titles: unique_titles(
+                self.list_titles(project, TodoStatus::Completed)?
+                    .into_iter()
+                    .chain(self.list_titles(project, TodoStatus::Cancelled)?)
+                    .collect::<Vec<_>>(),
+            ),
+        })
     }
 
     pub fn add(&self, project: &str, title: &str, priority: u8, tags: &[String]) -> Result<()> {

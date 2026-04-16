@@ -276,6 +276,7 @@ name = "hj-doob"
 version = "0.1.1"
 dependencies = [
  "anyhow",
+ "hj-core",
  "serde",
  "serde_json",
 ]

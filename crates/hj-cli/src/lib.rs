@@ -9,7 +9,7 @@ use std::process;
 use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands};
-use handoff::ReconcileMode;
+use hj_core::ReconcileMode;
 
 pub fn main_entry() {
     if let Err(error) = run() {

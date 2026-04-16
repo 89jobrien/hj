@@ -1,20 +1,36 @@
-use std::{collections::BTreeSet, fs, path::Path, process};
+use std::{fs, path::Path, process};
 
 use anyhow::{Context, Result, anyhow, bail};
-use hj_core::{ExtraEntry, Handoff, HandoffItem, HandoffState, LogEntry};
-use hj_doob::{
-    DoobClient, ReconcileReport, TodoStatus, ensure_doob_on_path, map_priority, unique_titles,
+use hj_core::{
+    ExtraEntry, Handoff, HandoffItem, HandoffState, LogEntry, ReconcileMode, ReconcileReport,
+    build_reconcile_plan,
 };
+use hj_doob::{DoobClient, ensure_doob_on_path, map_priority};
 use hj_git::{RepoContext, branch_name, current_short_head, discover, today};
 use hj_render::{render_handover_markdown, render_markdown};
 use hj_sqlite::{HandoffDb, HandoffRow};
 
 use crate::cli::{CloseArgs, DbArgs, DbCommand, DetectArgs, RefreshArgs, TargetArgs};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub(crate) enum ReconcileMode {
-    Sync,
-    Audit,
+trait TodoMemoryBackend {
+    fn snapshot(&self, project: &str) -> Result<hj_core::TodoSnapshot>;
+    fn create(&self, project: &str, item: &hj_core::ReconcileCreate) -> Result<()>;
+}
+
+impl TodoMemoryBackend for DoobClient {
+    fn snapshot(&self, project: &str) -> Result<hj_core::TodoSnapshot> {
+        DoobClient::snapshot(self, project)
+    }
+
+    fn create(&self, project: &str, item: &hj_core::ReconcileCreate) -> Result<()> {
+        let tags = vec!["handoff".to_string(), project.to_string()];
+        self.add(
+            project,
+            &item.title,
+            map_priority(item.priority.as_deref()),
+            &tags,
+        )
+    }
 }
 
 pub(crate) fn detect(args: DetectArgs) -> Result<()> {
@@ -331,90 +347,21 @@ fn load_target_handoff(
 }
 
 fn reconcile_handoff(
-    doob: &DoobClient,
+    backend: &impl TodoMemoryBackend,
     project: &str,
     handoff: &Handoff,
     mode: ReconcileMode,
 ) -> Result<ReconcileReport> {
-    let pending = doob.list_titles(project, TodoStatus::Pending)?;
-    let in_progress = doob.list_titles(project, TodoStatus::InProgress)?;
-    let completed = doob.list_titles(project, TodoStatus::Completed)?;
-    let cancelled = doob.list_titles(project, TodoStatus::Cancelled)?;
+    let snapshot = backend.snapshot(project)?;
+    let plan = build_reconcile_plan(project, handoff, &snapshot, mode);
 
-    let mut active_titles = unique_titles(
-        pending
-            .iter()
-            .chain(in_progress.iter())
-            .cloned()
-            .collect::<Vec<_>>(),
-    );
-    let closed_titles = unique_titles(
-        completed
-            .iter()
-            .chain(cancelled.iter())
-            .cloned()
-            .collect::<Vec<_>>(),
-    );
-
-    let mut captured_count = 0usize;
-    let mut created_count = 0usize;
-    let mut not_captured = Vec::new();
-    let mut closed_upstream = Vec::new();
-    let mut handoff_titles = BTreeSet::new();
-
-    for item in handoff.active_items() {
-        for variant in item.title_variants() {
-            handoff_titles.insert(variant);
-        }
-
-        if contains_any(&active_titles, item) {
-            captured_count += 1;
-            continue;
-        }
-
-        if contains_any(&closed_titles, item) {
-            closed_upstream.push(item.doob_title());
-            continue;
-        }
-
-        match mode {
-            ReconcileMode::Sync => {
-                let title = item.doob_title();
-                let tags = vec!["handoff".to_string(), project.to_string()];
-                doob.add(
-                    project,
-                    &title,
-                    map_priority(item.priority.as_deref()),
-                    &tags,
-                )?;
-                active_titles.push(title);
-                active_titles = unique_titles(active_titles);
-                captured_count += 1;
-                created_count += 1;
-            }
-            ReconcileMode::Audit => not_captured.push(item.doob_title()),
+    if mode == ReconcileMode::Sync {
+        for create in &plan.creates {
+            backend.create(project, create)?;
         }
     }
 
-    let orphaned = active_titles
-        .into_iter()
-        .filter(|title| !handoff_titles.contains(title))
-        .collect::<Vec<_>>();
-
-    Ok(ReconcileReport {
-        project: project.to_string(),
-        captured_count,
-        created_count,
-        not_captured,
-        orphaned,
-        closed_upstream,
-    })
-}
-
-fn contains_any(existing: &[String], item: &HandoffItem) -> bool {
-    item.title_variants()
-        .into_iter()
-        .any(|variant| existing.iter().any(|title| title == &variant))
+    Ok(plan.report)
 }
 
 fn apply_sqlite_overrides(project: &str, handoff: &mut Handoff) -> Result<()> {
@@ -536,7 +483,7 @@ fn print_triage_bucket(label: &str, items: &[String]) {
 fn print_reconcile_report(mode: ReconcileMode, report: &ReconcileReport) {
     println!("Reconciliation — {}", report.project);
     println!("===========================");
-    println!("Captured (HANDOFF→doob):  {} items", report.captured_count);
+    println!("Captured in backend:      {} items", report.captured_count);
     if mode == ReconcileMode::Sync {
         println!("Created this run:         {} items", report.created_count);
     }
@@ -544,14 +491,14 @@ fn print_reconcile_report(mode: ReconcileMode, report: &ReconcileReport) {
         "Not captured:             {} items",
         report.not_captured.len()
     );
-    println!("Orphaned todos:           {} items", report.orphaned.len());
+    println!("Orphaned backend items:   {} items", report.orphaned.len());
     println!(
         "Closed upstream:          {} items",
         report.closed_upstream.len()
     );
 
     print_list("Missing items:", &report.not_captured);
-    print_list("Orphaned todos:", &report.orphaned);
+    print_list("Orphaned backend items:", &report.orphaned);
     print_list("Closed upstream:", &report.closed_upstream);
 }
 

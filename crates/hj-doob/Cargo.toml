@@ -12,5 +12,6 @@ categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 anyhow.workspace = true
+hj-core = { version = "0.1.1", path = "../hj-core" }
 serde.workspace = true
 serde_json.workspace = true
