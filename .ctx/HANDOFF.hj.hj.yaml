@@ -1,8 +1,19 @@
 project: hj
 id: hj
-updated: 2026-04-16
-items: []
+updated: 2026-04-18
+items:
+- id: hj-cli-output
+  title: Improve hj-cli terminal output formatting
+  priority: P2
+  status: open
+  description: >
+    Replace markdown-style headers in handon output, align close/reconcile label columns,
+    style triage buckets with Unicode separators, fix db query column alignment.
+    No new deps — plain format strings only.
 log:
+- date: 2026-04-18
+  summary: Reviewed hj-cli output formatting and dashbox mermaid renderer; no code changes this session.
+  commits: []
 - date: 2026-04-16
   summary: |
     Fixed explicit and migrated nested handoff targeting so sibling state paths and project names rebind to the resolved HANDOFF file, and covered the regression with hj-cli tests.
