@@ -44,7 +44,6 @@ impl HandoffDb {
         })
     }
 
-    #[cfg(test)]
     pub fn with_path(db_path: PathBuf) -> Self {
         Self { db_path }
     }
@@ -205,7 +204,6 @@ impl HandupDb {
         })
     }
 
-    #[cfg(test)]
     pub fn with_path(db_path: PathBuf) -> Self {
         Self { db_path }
     }

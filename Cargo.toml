@@ -6,6 +6,7 @@ members = [
     "crates/hj-git",
     "crates/hj-render",
     "crates/hj-sqlite",
+    "tests/conformance",
 ]
 resolver = "2"
 

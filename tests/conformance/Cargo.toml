@@ -1,0 +1,15 @@
+[package]
+name = "conformance"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dev-dependencies]
+hj-core   = { version = "0.1.2", path = "../../crates/hj-core" }
+hj-sqlite = { version = "0.1.2", path = "../../crates/hj-sqlite" }
+hj-doob   = { version = "0.1.2", path = "../../crates/hj-doob" }
+hj-git    = { version = "0.1.2", path = "../../crates/hj-git" }
+hj-render = { version = "0.1.2", path = "../../crates/hj-render" }
+rusqlite.workspace = true
+serde_yaml.workspace = true
+tempfile.workspace = true

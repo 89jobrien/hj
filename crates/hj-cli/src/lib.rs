@@ -47,8 +47,10 @@ mod tests {
         cli::{Cli, Commands, InstallArgs, TargetArgs, UpdateArgs},
     };
 
+    // §6.1 — alias rewriting
+
     #[test]
-    fn handoff_detect_alias_rewrites_to_subcommand() {
+    fn s6_1_handoff_detect_alias_rewrites_to_detect() {
         let rewritten = rewrite_args_for_alias([
             OsString::from("handoff-detect"),
             OsString::from("--project"),
@@ -64,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn handoff_alias_rewrites_to_subcommand() {
+    fn s6_1_handoff_alias_rewrites_to_handoff() {
         let rewritten = rewrite_args_for_alias([OsString::from("handoff")]);
         assert_eq!(
             rewritten,
@@ -73,7 +75,7 @@ mod tests {
     }
 
     #[test]
-    fn handon_alias_rewrites_to_subcommand() {
+    fn s6_1_handon_alias_rewrites_to_handon() {
         let rewritten = rewrite_args_for_alias([OsString::from("handon")]);
         assert_eq!(
             rewritten,
@@ -82,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn handover_alias_rewrites_to_subcommand() {
+    fn s6_1_handover_alias_rewrites_to_handover() {
         let rewritten = rewrite_args_for_alias([OsString::from("handover")]);
         assert_eq!(
             rewritten,
@@ -91,7 +93,42 @@ mod tests {
     }
 
     #[test]
-    fn install_command_uses_default_root() {
+    fn s6_1_handup_alias_rewrites_to_handup() {
+        let rewritten = rewrite_args_for_alias([OsString::from("handup"), OsString::from("--max-depth"), OsString::from("3")]);
+        assert_eq!(
+            rewritten,
+            vec![
+                OsString::from("hj"),
+                OsString::from("handup"),
+                OsString::from("--max-depth"),
+                OsString::from("3"),
+            ]
+        );
+    }
+
+    #[test]
+    fn s6_1_handoff_db_alias_rewrites_to_handoff_db() {
+        let rewritten = rewrite_args_for_alias([OsString::from("handoff-db"), OsString::from("query")]);
+        assert_eq!(
+            rewritten,
+            vec![
+                OsString::from("hj"),
+                OsString::from("handoff-db"),
+                OsString::from("query"),
+            ]
+        );
+    }
+
+    #[test]
+    fn s6_1_non_alias_passthrough() {
+        let rewritten = rewrite_args_for_alias([OsString::from("hj"), OsString::from("detect")]);
+        assert_eq!(rewritten, vec![OsString::from("hj"), OsString::from("detect")]);
+    }
+
+    // §6.2 — CLI parsing
+
+    #[test]
+    fn s6_2_install_command_uses_default_root() {
         let cli = Cli::parse_from([OsStr::new("hj"), OsStr::new("install")]);
         match cli.command {
             Commands::Install(InstallArgs { root }) => assert_eq!(root, "~/.local"),
@@ -100,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    fn update_command_uses_default_root() {
+    fn s6_2_update_command_uses_default_root() {
         let cli = Cli::parse_from([OsStr::new("hj"), OsStr::new("update")]);
         match cli.command {
             Commands::Update(UpdateArgs { root }) => assert_eq!(root, "~/.local"),
@@ -109,7 +146,7 @@ mod tests {
     }
 
     #[test]
-    fn update_all_command_parses_separately() {
+    fn s6_2_update_all_command_parses_separately() {
         let cli = Cli::parse_from([OsStr::new("hj"), OsStr::new("update-all")]);
         match cli.command {
             Commands::UpdateAll(UpdateArgs { root }) => assert_eq!(root, "~/.local"),
@@ -118,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn handon_command_parses_target_args() {
+    fn s6_2_handon_command_parses_target_args() {
         let cli = Cli::parse_from([
             OsStr::new("hj"),
             OsStr::new("handon"),

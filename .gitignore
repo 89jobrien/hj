@@ -3,6 +3,7 @@
 # handoff-begin
 .ctx/*
 !.ctx/HANDOFF.*.yaml
+!.ctx/conformance.md
 .ctx/HANDOFF.*.state.yaml
 !.ctx/handoff.*.config.toml.example
 .ctx/HANDOFF.*.*.state.yaml
