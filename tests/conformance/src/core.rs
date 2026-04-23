@@ -247,6 +247,7 @@ fn s1_5_state_round_trips() {
         tests: Some("passing".into()),
         notes: Some("Some notes.".into()),
         touched_files: vec!["src/lib.rs".into()],
+        last_log: None,
         extra: Default::default(),
     };
     let yaml = serde_yaml::to_string(&state).expect("serialize");

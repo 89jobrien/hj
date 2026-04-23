@@ -1,4 +1,4 @@
-use std::{fs, path::Path, process};
+use std::{fs, io::Write, path::Path, process};
 
 use anyhow::{Context, Result, anyhow, bail};
 use hj_core::{
@@ -87,6 +87,7 @@ pub(crate) fn handon(args: TargetArgs) -> Result<()> {
     let context = discover(Path::new("."))?;
     let (paths, mut handoff) = load_target_handoff(&context, args, false)?;
     apply_sqlite_overrides(&paths.project, &mut handoff)?;
+    apply_db_log(&paths.project, &mut handoff);
     let state = load_state(&paths.state_path)?;
     let review = collect_review_on_wake(&handoff);
     let triage = classify_items(&handoff);
@@ -101,6 +102,9 @@ pub(crate) fn handon(args: TargetArgs) -> Result<()> {
             state.build.as_deref().unwrap_or("unknown"),
             state.tests.as_deref().unwrap_or("unknown")
         );
+        if let Some(last_log) = state.last_log.as_deref().filter(|s| !s.is_empty()) {
+            println!("Last session: {last_log}");
+        }
         if let Some(notes) = state.notes.as_deref().filter(|notes| !notes.is_empty()) {
             println!("{notes}");
         }
@@ -135,6 +139,7 @@ pub(crate) fn handover(args: TargetArgs) -> Result<()> {
     let context = discover(Path::new("."))?;
     let (paths, mut handoff) = load_target_handoff(&context, args, false)?;
     apply_sqlite_overrides(&paths.project, &mut handoff)?;
+    apply_db_log(&paths.project, &mut handoff);
     let state = load_state(&paths.state_path)?;
     let rendered = render_handover_markdown(&handoff, state.as_ref());
     fs::write(&paths.handover_path, rendered)
@@ -215,27 +220,39 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
     handoff.ensure_id_prefix(&paths.project);
     handoff.updated = Some(today.clone());
 
-    if let Some(summary) = args.log_summary {
-        let commits = if args.commits.is_empty() {
+    let log_commits = if args.log_summary.is_some() {
+        if args.commits.is_empty() {
             current_short_head(&context.repo_root)
                 .map(|hash| vec![hash])
                 .unwrap_or_default()
         } else {
             args.commits.clone()
-        };
+        }
+    } else {
+        Vec::new()
+    };
 
+    if let Some(ref summary) = args.log_summary {
         handoff.log.insert(
             0,
             LogEntry {
                 date: Some(today.clone()),
-                summary,
-                commits,
+                summary: summary.clone(),
+                commits: log_commits.clone(),
                 ..LogEntry::default()
             },
         );
     }
 
-    let state = build_state(&context, &paths, args.build, args.tests, args.notes)?;
+    let mut state = build_state(&context, &paths, args.build, args.tests, args.notes)?;
+
+    let db = HandoffDb::new()?;
+    if let Some(ref summary) = args.log_summary {
+        db.log_append(&paths.project, &today, summary, &log_commits)?;
+        append_jsonl_log(&paths.project, &today, summary, &log_commits)?;
+        state.last_log = Some(summary.clone());
+    }
+
     fs::create_dir_all(&paths.ctx_dir)
         .with_context(|| format!("failed to create {}", paths.ctx_dir.display()))?;
     fs::write(&paths.handoff_path, serde_yaml::to_string(&handoff)?)
@@ -243,7 +260,6 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
     fs::write(&paths.state_path, serde_json::to_string_pretty(&state)?)
         .with_context(|| format!("failed to write {}", paths.state_path.display()))?;
 
-    let db = HandoffDb::new()?;
     let upsert = db.upsert(&paths.project, &handoff, &today)?;
     let doob = DoobClient::new(&context.repo_root);
     ensure_doob_on_path(&context.repo_root)?;
@@ -413,6 +429,38 @@ fn reconcile_handoff(
     }
 
     Ok(plan.report)
+}
+
+fn append_jsonl_log(project: &str, date: &str, summary: &str, commits: &[String]) -> Result<()> {
+    let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
+    let log_path = home.join(".local/share/atelier/handoff-log.jsonl");
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .with_context(|| format!("failed to open {}", log_path.display()))?;
+    let line = serde_json::json!({
+        "date": date,
+        "project": project,
+        "summary": summary,
+        "commits": commits,
+    });
+    writeln!(file, "{line}").with_context(|| format!("failed to write {}", log_path.display()))?;
+    Ok(())
+}
+
+fn apply_db_log(project: &str, handoff: &mut Handoff) {
+    let Ok(db) = HandoffDb::new() else { return };
+    let Ok(entries) = db.log_query(project) else {
+        return;
+    };
+    if !entries.is_empty() {
+        handoff.log = entries;
+    }
 }
 
 fn apply_sqlite_overrides(project: &str, handoff: &mut Handoff) -> Result<()> {
