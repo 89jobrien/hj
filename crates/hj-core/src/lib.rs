@@ -87,6 +87,8 @@ pub struct HandoffState {
     pub notes: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub touched_files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_log: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, serde_yaml::Value>,
 }
@@ -469,5 +471,6 @@ mod tests {
 
         let rendered = serde_yaml::to_string(&state).expect("serialize state");
         assert!(!rendered.contains("touched_files"));
+        assert!(!rendered.contains("last_log"));
     }
 }

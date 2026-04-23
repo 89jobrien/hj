@@ -292,6 +292,7 @@ fn build_state(
         tests: tests.or(existing.tests).or(Some("unknown".into())),
         notes: notes.or(existing.notes),
         touched_files: Vec::new(),
+        last_log: existing.last_log,
         extra: existing.extra,
     })
 }

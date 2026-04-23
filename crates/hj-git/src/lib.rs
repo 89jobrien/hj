@@ -123,6 +123,7 @@ impl RepoContext {
                     tests: Some("unknown".to_string()),
                     notes: None,
                     touched_files: Vec::new(),
+                    last_log: None,
                     extra: Default::default(),
                 };
                 fs::write(&state_path, serde_json::to_string_pretty(&state)?)
