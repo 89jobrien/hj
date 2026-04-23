@@ -487,12 +487,12 @@ mod tests {
     fn log_commits_accept_bare_sha_and_object_form() {
         let yaml = r#"
 log:
-  - date: "20260422:120000"
+  - date: "20260422.120000"
     summary: bare sha form
     commits:
       - abc1234
       - def5678
-  - date: "20260422:130000"
+  - date: "20260422.130000"
     summary: object form
     commits:
       - sha: aaa1111
