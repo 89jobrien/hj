@@ -82,7 +82,7 @@ impl RepoContext {
         let project = sanitize_name(&project);
         let ctx_dir = self.repo_root.join(".ctx");
         let handoff_path = ctx_dir.join(format!("HANDOFF.{project}.{}.yaml", self.base_name));
-        let state_path = ctx_dir.join(format!("HANDOFF.{project}.{}.state.yaml", self.base_name));
+        let state_path = ctx_dir.join(format!("HANDOFF.{project}.{}.state.json", self.base_name));
         let rendered_path = ctx_dir.join("HANDOFF.md");
         let handover_path = ctx_dir.join("HANDOVER.md");
 
@@ -114,7 +114,7 @@ impl RepoContext {
         let packages = scan_package_names(&self.repo_root)?;
 
         for pkg in &packages {
-            let state_path = ctx_dir.join(format!("HANDOFF.{pkg}.{}.state.yaml", self.base_name));
+            let state_path = ctx_dir.join(format!("HANDOFF.{pkg}.{}.state.json", self.base_name));
             if !state_path.exists() {
                 let state = HandoffState {
                     updated: Some(today.clone()),
@@ -125,7 +125,7 @@ impl RepoContext {
                     touched_files: Vec::new(),
                     extra: Default::default(),
                 };
-                fs::write(&state_path, serde_yaml::to_string(&state)?)
+                fs::write(&state_path, serde_json::to_string_pretty(&state)?)
                     .with_context(|| format!("failed to write {}", state_path.display()))?;
             }
         }
@@ -221,8 +221,16 @@ pub fn discover_handoffs(base: &Path, max_depth: usize) -> Result<Vec<SurveyHand
         if path.extension().and_then(OsStr::to_str) == Some("yaml") {
             let contents = fs::read_to_string(path)
                 .with_context(|| format!("failed to read {}", path.display()))?;
-            let handoff: Handoff = serde_yaml::from_str(&contents)
-                .with_context(|| format!("failed to parse {}", path.display()))?;
+            let handoff: Handoff = match serde_yaml::from_str(&contents) {
+                Ok(h) => h,
+                Err(e) => {
+                    eprintln!(
+                        "warning: skipping malformed handoff {}: {e}",
+                        path.display()
+                    );
+                    continue;
+                }
+            };
             let project_name = handoff
                 .project
                 .clone()
@@ -420,7 +428,7 @@ fn scan_package_names(repo_root: &Path) -> Result<Vec<String>> {
 fn is_ignored_dir(path: &Path) -> bool {
     matches!(
         path.file_name().and_then(OsStr::to_str),
-        Some(".git" | "target" | "vendor" | "__pycache__")
+        Some(".git" | "target" | "vendor" | "__pycache__" | "worktrees" | ".tmp-dogfood")
     )
 }
 
@@ -430,7 +438,7 @@ fn is_handoff_file(path: &Path) -> bool {
     };
 
     (name.starts_with("HANDOFF.") && (name.ends_with(".yaml") || name.ends_with(".md")))
-        && !name.ends_with(".state.yaml")
+        && !name.ends_with(".state.json")
 }
 
 fn is_marker_file(path: &Path) -> bool {
@@ -450,7 +458,7 @@ fn read_state_fields(handoff_path: &Path) -> Result<(Option<String>, Option<Stri
     let Some(name) = handoff_path.file_name().and_then(OsStr::to_str) else {
         return Ok((None, None));
     };
-    let state_name = name.replace(".yaml", ".state.yaml");
+    let state_name = name.replace(".yaml", ".state.json");
     let state_path = handoff_path.with_file_name(state_name);
     if !state_path.exists() {
         return Ok((None, None));
@@ -458,7 +466,7 @@ fn read_state_fields(handoff_path: &Path) -> Result<(Option<String>, Option<Stri
 
     let contents = fs::read_to_string(&state_path)
         .with_context(|| format!("failed to read {}", state_path.display()))?;
-    let state: HandoffState = serde_yaml::from_str(&contents)
+    let state: HandoffState = serde_json::from_str(&contents)
         .with_context(|| format!("failed to parse {}", state_path.display()))?;
     Ok((state.build, state.tests))
 }
@@ -538,10 +546,10 @@ fn write_gitignore_block(repo_root: &Path) -> Result<()> {
         "# handoff-begin",
         ".ctx/*",
         "!.ctx/HANDOFF.*.yaml",
-        ".ctx/HANDOFF.*.state.yaml",
+        ".ctx/HANDOFF.*.state.json",
         "!.ctx/handoff.*.config.toml.example",
-        ".ctx/HANDOFF.*.*.state.yaml",
-        ".ctx/HANDOFF.hj.hj.state.yaml",
+        ".ctx/HANDOFF.*.*.state.json",
+        ".ctx/HANDOFF.hj.hj.state.json",
         ".ctx/.initialized",
         "# handoff-end",
     ];
@@ -641,8 +649,8 @@ mod tests {
         let updated = fs::read_to_string(gitignore).unwrap();
 
         assert!(updated.contains(".ctx/*"));
-        assert!(updated.contains(".ctx/HANDOFF.*.*.state.yaml"));
-        assert!(updated.contains(".ctx/HANDOFF.hj.hj.state.yaml"));
+        assert!(updated.contains(".ctx/HANDOFF.*.*.state.json"));
+        assert!(updated.contains(".ctx/HANDOFF.hj.hj.state.json"));
         assert!(updated.contains("target/"));
         assert!(updated.contains("node_modules/"));
         assert!(!updated.contains("\nold\n"));

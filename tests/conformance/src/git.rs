@@ -1,7 +1,7 @@
 // §4 — hj-git → hj-core adapter contracts
 
-use std::fs;
 use hj_git::RepoContext;
+use std::fs;
 use tempfile::tempdir;
 
 // §4.1 — is_handoff_file filter
@@ -38,10 +38,16 @@ fn s4_2_extracts_bullets_from_known_gaps() {
     );
 
     let results = discover_handoffs(tmp.path(), 3).unwrap();
-    let survey = results.iter().find(|s| s.path.ends_with("HANDOFF.test.test.md"));
+    let survey = results
+        .iter()
+        .find(|s| s.path.ends_with("HANDOFF.test.test.md"));
     assert!(survey.is_some(), "markdown handoff must be discovered");
     let items = &survey.unwrap().items;
-    assert_eq!(items.len(), 2, "only bullets from Known Gaps must be extracted");
+    assert_eq!(
+        items.len(),
+        2,
+        "only bullets from Known Gaps must be extracted"
+    );
     assert_eq!(items[0].title, "Fix the thing");
     assert_eq!(items[1].title, "Implement other");
 }
@@ -56,7 +62,10 @@ fn s4_2_extracts_bullets_from_next_up() {
     );
 
     let results = discover_handoffs(tmp.path(), 3).unwrap();
-    let survey = results.iter().find(|s| s.path.ends_with("HANDOFF.test.test.md")).unwrap();
+    let survey = results
+        .iter()
+        .find(|s| s.path.ends_with("HANDOFF.test.test.md"))
+        .unwrap();
     assert_eq!(survey.items.len(), 1);
     assert_eq!(survey.items[0].title, "Wire the adapter");
 }
@@ -71,7 +80,10 @@ fn s4_2_infers_priority_via_hj_core() {
     );
 
     let results = discover_handoffs(tmp.path(), 3).unwrap();
-    let survey = results.iter().find(|s| s.path.ends_with("HANDOFF.test.test.md")).unwrap();
+    let survey = results
+        .iter()
+        .find(|s| s.path.ends_with("HANDOFF.test.test.md"))
+        .unwrap();
     let p0 = survey.items.iter().find(|i| i.title == "Fix broken thing");
     let p2 = survey.items.iter().find(|i| i.title == "Explore someday");
     assert_eq!(p0.unwrap().priority.as_deref(), Some("P0"));

@@ -11,14 +11,12 @@ use tempfile::tempdir;
 fn s2_1_upsert_then_query_round_trip() {
     let tmp = tempdir().unwrap();
     let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
-    let handoff = handoff_with(vec![
-        HandoffItem {
-            id: "hj-1".into(),
-            priority: Some("P1".into()),
-            status: Some("open".into()),
-            ..HandoffItem::default()
-        },
-    ]);
+    let handoff = handoff_with(vec![HandoffItem {
+        id: "hj-1".into(),
+        priority: Some("P1".into()),
+        status: Some("open".into()),
+        ..HandoffItem::default()
+    }]);
 
     db.upsert("hj", &handoff, "2026-04-18").unwrap();
     let rows = db.query("hj").unwrap();
@@ -93,20 +91,39 @@ fn s2_2_upsert_prunes_removed_ids() {
 fn s2_2_pruning_scoped_to_project() {
     let tmp = tempdir().unwrap();
     let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
-    db.upsert("hj", &handoff_with(vec![item("hj-1", "P1", "open")]), "2026-04-17").unwrap();
-    db.upsert("other", &handoff_with(vec![item("other-1", "P2", "open")]), "2026-04-17").unwrap();
+    db.upsert(
+        "hj",
+        &handoff_with(vec![item("hj-1", "P1", "open")]),
+        "2026-04-17",
+    )
+    .unwrap();
+    db.upsert(
+        "other",
+        &handoff_with(vec![item("other-1", "P2", "open")]),
+        "2026-04-17",
+    )
+    .unwrap();
 
     db.upsert("hj", &Handoff::default(), "2026-04-18").unwrap();
 
     assert!(db.query("hj").unwrap().is_empty(), "hj rows must be pruned");
-    assert_eq!(db.query("other").unwrap().len(), 1, "other project rows must survive");
+    assert_eq!(
+        db.query("other").unwrap().len(),
+        1,
+        "other project rows must survive"
+    );
 }
 
 #[test]
 fn s2_2_empty_handoff_clears_all_project_rows() {
     let tmp = tempdir().unwrap();
     let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
-    db.upsert("hj", &handoff_with(vec![item("hj-1", "P1", "open")]), "2026-04-17").unwrap();
+    db.upsert(
+        "hj",
+        &handoff_with(vec![item("hj-1", "P1", "open")]),
+        "2026-04-17",
+    )
+    .unwrap();
 
     db.upsert("hj", &Handoff::default(), "2026-04-18").unwrap();
 
@@ -119,7 +136,12 @@ fn s2_2_empty_handoff_clears_all_project_rows() {
 fn s2_3_complete_sets_done_and_stamps_date() {
     let tmp = tempdir().unwrap();
     let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
-    db.upsert("hj", &handoff_with(vec![item("hj-1", "P1", "open")]), "2026-04-17").unwrap();
+    db.upsert(
+        "hj",
+        &handoff_with(vec![item("hj-1", "P1", "open")]),
+        "2026-04-17",
+    )
+    .unwrap();
 
     let changed = db.complete("hj", "hj-1", "2026-04-18").unwrap();
     assert!(changed);
@@ -133,9 +155,15 @@ fn s2_3_complete_sets_done_and_stamps_date() {
 fn s2_3_set_status_does_not_touch_completed() {
     let tmp = tempdir().unwrap();
     let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
-    db.upsert("hj", &handoff_with(vec![item("hj-1", "P1", "open")]), "2026-04-17").unwrap();
+    db.upsert(
+        "hj",
+        &handoff_with(vec![item("hj-1", "P1", "open")]),
+        "2026-04-17",
+    )
+    .unwrap();
 
-    db.set_status("hj", "hj-1", "blocked", "2026-04-18").unwrap();
+    db.set_status("hj", "hj-1", "blocked", "2026-04-18")
+        .unwrap();
 
     let rows = db.query("hj").unwrap();
     assert_eq!(rows[0].status, "blocked");
@@ -210,5 +238,8 @@ fn item(id: &str, priority: &str, status: &str) -> HandoffItem {
 }
 
 fn handoff_with(items: Vec<HandoffItem>) -> Handoff {
-    Handoff { items, ..Handoff::default() }
+    Handoff {
+        items,
+        ..Handoff::default()
+    }
 }

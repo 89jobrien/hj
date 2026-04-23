@@ -94,7 +94,11 @@ mod tests {
 
     #[test]
     fn s6_1_handup_alias_rewrites_to_handup() {
-        let rewritten = rewrite_args_for_alias([OsString::from("handup"), OsString::from("--max-depth"), OsString::from("3")]);
+        let rewritten = rewrite_args_for_alias([
+            OsString::from("handup"),
+            OsString::from("--max-depth"),
+            OsString::from("3"),
+        ]);
         assert_eq!(
             rewritten,
             vec![
@@ -108,7 +112,8 @@ mod tests {
 
     #[test]
     fn s6_1_handoff_db_alias_rewrites_to_handoff_db() {
-        let rewritten = rewrite_args_for_alias([OsString::from("handoff-db"), OsString::from("query")]);
+        let rewritten =
+            rewrite_args_for_alias([OsString::from("handoff-db"), OsString::from("query")]);
         assert_eq!(
             rewritten,
             vec![
@@ -122,7 +127,10 @@ mod tests {
     #[test]
     fn s6_1_non_alias_passthrough() {
         let rewritten = rewrite_args_for_alias([OsString::from("hj"), OsString::from("detect")]);
-        assert_eq!(rewritten, vec![OsString::from("hj"), OsString::from("detect")]);
+        assert_eq!(
+            rewritten,
+            vec![OsString::from("hj"), OsString::from("detect")]
+        );
     }
 
     // §6.2 — CLI parsing

@@ -91,7 +91,9 @@ pub(crate) fn handon(args: TargetArgs) -> Result<()> {
     let review = collect_review_on_wake(&handoff);
     let triage = classify_items(&handoff);
 
-    println!("## Handoff Triage — {}", paths.repo_root.display());
+    let header = format!("Handoff Triage — {}", paths.repo_root.display());
+    println!("{header}");
+    println!("{}", "─".repeat(header.chars().count().min(72)));
     if let Some(state) = state.as_ref() {
         println!(
             "Branch: {} | Build: {} | Tests: {}",
@@ -109,19 +111,21 @@ pub(crate) fn handon(args: TargetArgs) -> Result<()> {
     println!();
 
     if !review.is_empty() {
-        println!("## Review on Wake");
+        println!("Review on Wake");
+        println!("──────────────");
         for line in review {
             println!("{line}");
         }
         println!();
     }
 
-    print_triage_bucket("P0", &triage.p0);
-    print_triage_bucket("P1", &triage.p1);
-    print_triage_bucket("P2", &triage.p2);
-
-    if triage.p0.is_empty() && triage.p1.is_empty() && triage.p2.is_empty() {
-        println!("No open handoff items.");
+    let all_empty = triage.p0.is_empty() && triage.p1.is_empty() && triage.p2.is_empty();
+    if all_empty {
+        println!("No open items.");
+    } else {
+        print_triage_bucket("P0", &triage.p0);
+        print_triage_bucket("P1", &triage.p1);
+        print_triage_bucket("P2", &triage.p2);
     }
 
     Ok(())
@@ -161,7 +165,7 @@ pub(crate) fn handoff_db(args: DbArgs) -> Result<()> {
         DbCommand::Query(args) => {
             for row in db.query(&args.project)? {
                 println!(
-                    "{}|{}|{}|{}|{}",
+                    "{:<20} {:<6} {:<10} {:<12} {:<12}",
                     row.id, row.priority, row.status, row.completed, row.updated
                 );
             }
@@ -236,7 +240,7 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
         .with_context(|| format!("failed to create {}", paths.ctx_dir.display()))?;
     fs::write(&paths.handoff_path, serde_yaml::to_string(&handoff)?)
         .with_context(|| format!("failed to write {}", paths.handoff_path.display()))?;
-    fs::write(&paths.state_path, serde_yaml::to_string(&state)?)
+    fs::write(&paths.state_path, serde_json::to_string_pretty(&state)?)
         .with_context(|| format!("failed to write {}", paths.state_path.display()))?;
 
     let db = HandoffDb::new()?;
@@ -275,7 +279,7 @@ fn build_state(
     let existing = if paths.state_path.exists() {
         let contents = fs::read_to_string(&paths.state_path)
             .with_context(|| format!("failed to read {}", paths.state_path.display()))?;
-        serde_yaml::from_str::<HandoffState>(&contents)
+        serde_json::from_str::<HandoffState>(&contents)
             .with_context(|| format!("failed to parse {}", paths.state_path.display()))?
     } else {
         HandoffState::default()
@@ -299,7 +303,7 @@ fn load_state(path: &Path) -> Result<Option<HandoffState>> {
 
     let contents =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
-    let state = serde_yaml::from_str::<HandoffState>(&contents)
+    let state = serde_json::from_str::<HandoffState>(&contents)
         .with_context(|| format!("failed to parse {}", path.display()))?;
     Ok(Some(state))
 }
@@ -378,7 +382,7 @@ fn state_path_for_handoff(handoff_path: &Path) -> Result<std::path::PathBuf> {
     let stem = file_name
         .strip_suffix(".yaml")
         .ok_or_else(|| anyhow!("handoff path must end with .yaml"))?;
-    Ok(handoff_path.with_file_name(format!("{stem}.state.yaml")))
+    Ok(handoff_path.with_file_name(format!("{stem}.state.json")))
 }
 
 fn project_from_handoff_path(handoff_path: &Path, base_name: &str) -> Option<String> {
@@ -497,51 +501,30 @@ fn classify_items(handoff: &Handoff) -> TriageBuckets {
 }
 
 fn format_triage_item(item: &HandoffItem) -> String {
-    let name = item.name.as_deref().unwrap_or("-");
-    let mut line = format!(
-        "- [{}] [{}] \"{}\" -> {}",
-        item.id,
-        name,
-        item.title,
-        item.status.as_deref().unwrap_or("open")
-    );
-    if let Some(description) = item
-        .description
-        .as_deref()
-        .filter(|value| !value.is_empty())
-    {
-        line.push_str(&format!(": {description}"));
-    }
-    line
+    let status = item.status.as_deref().unwrap_or("open");
+    format!("  · {:<20} {:<8} {}", item.id, status, item.title)
 }
 
 fn print_triage_bucket(label: &str, items: &[String]) {
-    println!("{label}:");
     if items.is_empty() {
-        println!("  - none");
-    } else {
-        for item in items {
-            println!("  {item}");
-        }
+        return;
+    }
+    println!("{label}  {}", "─".repeat(24));
+    for item in items {
+        println!("{item}");
     }
 }
 
 fn print_reconcile_report(mode: ReconcileMode, report: &ReconcileReport) {
     println!("Reconciliation — {}", report.project);
-    println!("===========================");
-    println!("Captured in backend:      {} items", report.captured_count);
+    println!("{}", "─".repeat(27));
+    println!("{:<26} {}", "Captured in backend", report.captured_count);
     if mode == ReconcileMode::Sync {
-        println!("Created this run:         {} items", report.created_count);
+        println!("{:<26} {}", "Created this run", report.created_count);
     }
-    println!(
-        "Not captured:             {} items",
-        report.not_captured.len()
-    );
-    println!("Orphaned backend items:   {} items", report.orphaned.len());
-    println!(
-        "Closed upstream:          {} items",
-        report.closed_upstream.len()
-    );
+    println!("{:<26} {}", "Not captured", report.not_captured.len());
+    println!("{:<26} {}", "Orphaned", report.orphaned.len());
+    println!("{:<26} {}", "Closed upstream", report.closed_upstream.len());
 
     print_list("Missing items:", &report.not_captured);
     print_list("Orphaned backend items:", &report.orphaned);
@@ -628,7 +611,7 @@ mod tests {
             repo_root: PathBuf::from("/repo"),
             ctx_dir: PathBuf::from("/repo/.ctx"),
             handoff_path: PathBuf::from("/repo/.ctx/HANDOFF.hj.hj.yaml"),
-            state_path: PathBuf::from("/repo/.ctx/HANDOFF.hj.hj.state.yaml"),
+            state_path: PathBuf::from("/repo/.ctx/HANDOFF.hj.hj.state.json"),
             rendered_path: PathBuf::from("/repo/.ctx/HANDOFF.md"),
             handover_path: PathBuf::from("/repo/.ctx/HANDOVER.md"),
             project: "hj".into(),
@@ -646,7 +629,7 @@ mod tests {
         assert_eq!(rebound.handoff_path, explicit);
         assert_eq!(
             rebound.state_path,
-            PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.state.yaml")
+            PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.state.json")
         );
     }
 

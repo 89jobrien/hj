@@ -244,10 +244,20 @@ tests/
     cli.rs           # §6 — hj-cli composition root
 ```
 
+```
+tests/
+  conformance/
+    §PureDomain::core
+    §Ports::any
+    §Adapters::any
+    §CompositionRoot::cli
+```
+
 Each test function name must encode the section: e.g.
 `fn s1_1_reconcile_audit_no_creates()`, `fn s2_3_complete_sets_done_status()`.
 
 Integration tests requiring external processes are gated:
+
 ```rust
 #[test]
 #[cfg_attr(not(feature = "integration"), ignore)]

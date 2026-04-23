@@ -15,6 +15,7 @@ anyhow.workspace = true
 dirs.workspace = true
 hj-core = { version = "0.1.2", path = "../hj-core" }
 rusqlite.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

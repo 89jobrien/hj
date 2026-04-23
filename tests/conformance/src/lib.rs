@@ -2,9 +2,9 @@
 // Each module maps to one spec section in .ctx/conformance.md.
 
 #[cfg(test)]
-mod core;
+mod cli;
 #[cfg(test)]
-mod sqlite;
+mod core;
 #[cfg(test)]
 mod doob;
 #[cfg(test)]
@@ -12,4 +12,4 @@ mod git;
 #[cfg(test)]
 mod render;
 #[cfg(test)]
-mod cli; // §6 — documents why tests live in hj-cli instead
+mod sqlite; // §6 — documents why tests live in hj-cli instead

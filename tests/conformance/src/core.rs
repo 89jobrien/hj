@@ -1,8 +1,8 @@
 // §1 — hj-core pure domain contracts
 
 use hj_core::{
-    Handoff, HandoffItem, HandoffState, ReconcileMode, TodoSnapshot,
-    build_reconcile_plan, default_id_prefix, infer_priority, sanitize_name, titleize_slug,
+    Handoff, HandoffItem, HandoffState, ReconcileMode, TodoSnapshot, build_reconcile_plan,
+    default_id_prefix, infer_priority, sanitize_name, titleize_slug,
 };
 
 // §1.1 — build_reconcile_plan: audit mode never creates
@@ -10,16 +10,25 @@ use hj_core::{
 #[test]
 fn s1_1_reconcile_audit_no_creates() {
     let handoff = handoff_with_items(vec![open_item("hj-1", "Missing task")]);
-    let snapshot = TodoSnapshot { active_titles: vec![], closed_titles: vec![] };
+    let snapshot = TodoSnapshot {
+        active_titles: vec![],
+        closed_titles: vec![],
+    };
     let plan = build_reconcile_plan("hj", &handoff, &snapshot, ReconcileMode::Audit);
-    assert!(plan.creates.is_empty(), "audit mode must never populate creates");
+    assert!(
+        plan.creates.is_empty(),
+        "audit mode must never populate creates"
+    );
     assert_eq!(plan.report.not_captured, vec!["Missing task".to_string()]);
 }
 
 #[test]
 fn s1_1_reconcile_sync_creates_missing() {
     let handoff = handoff_with_items(vec![open_item("hj-1", "Missing task")]);
-    let snapshot = TodoSnapshot { active_titles: vec![], closed_titles: vec![] };
+    let snapshot = TodoSnapshot {
+        active_titles: vec![],
+        closed_titles: vec![],
+    };
     let plan = build_reconcile_plan("hj", &handoff, &snapshot, ReconcileMode::Sync);
     assert_eq!(plan.creates.len(), 1);
     assert_eq!(plan.creates[0].title, "Missing task");
@@ -127,14 +136,21 @@ fn s1_2_title_variants_no_duplicates() {
     };
     let variants = item.title_variants();
     let deduped: std::collections::HashSet<_> = variants.iter().collect();
-    assert_eq!(variants.len(), deduped.len(), "title_variants must not contain duplicates");
+    assert_eq!(
+        variants.len(),
+        deduped.len(),
+        "title_variants must not contain duplicates"
+    );
 }
 
 #[test]
 fn s1_2_title_variants_no_empty_strings() {
     let item = open_item("x-1", "Task");
     for v in item.title_variants() {
-        assert!(!v.is_empty(), "title_variants must not contain empty strings");
+        assert!(
+            !v.is_empty(),
+            "title_variants must not contain empty strings"
+        );
     }
 }
 
@@ -142,7 +158,9 @@ fn s1_2_title_variants_no_empty_strings() {
 
 #[test]
 fn s1_3_p0_keywords() {
-    for kw in &["broken", "fails", "security", "blocked", "urgent", "panic", "segfault"] {
+    for kw in &[
+        "broken", "fails", "security", "blocked", "urgent", "panic", "segfault",
+    ] {
         assert_eq!(
             infer_priority(&format!("CI {kw}"), None),
             "P0",
@@ -188,7 +206,11 @@ fn s1_4_active_items_includes_open_and_blocked() {
     ]);
     let active: Vec<_> = handoff.active_items().collect();
     assert_eq!(active.len(), 2);
-    assert!(active.iter().all(|i| matches!(i.status.as_deref(), Some("open" | "blocked"))));
+    assert!(
+        active
+            .iter()
+            .all(|i| matches!(i.status.as_deref(), Some("open" | "blocked")))
+    );
 }
 
 #[test]
@@ -210,7 +232,10 @@ fn s1_5_state_omits_empty_touched_files() {
         ..HandoffState::default()
     };
     let yaml = serde_yaml::to_string(&state).expect("serialize");
-    assert!(!yaml.contains("touched_files"), "empty touched_files must be omitted");
+    assert!(
+        !yaml.contains("touched_files"),
+        "empty touched_files must be omitted"
+    );
 }
 
 #[test]
@@ -249,7 +274,10 @@ fn s1_6_titleize_slug_single_word() {
 fn s1_6_titleize_slug_skips_empty_segments() {
     // double-dash produces empty segment that must be skipped
     let result = titleize_slug("a--b");
-    assert!(!result.contains("  "), "consecutive spaces indicate empty segment not skipped");
+    assert!(
+        !result.contains("  "),
+        "consecutive spaces indicate empty segment not skipped"
+    );
 }
 
 // §1.7 — sanitize_name and default_id_prefix
@@ -263,7 +291,11 @@ fn s1_7_sanitize_name_lowercases_and_replaces() {
 #[test]
 fn s1_7_default_id_prefix_max_seven_chars() {
     let prefix = default_id_prefix("very-long-project-name");
-    assert!(prefix.len() <= 7, "prefix must be at most 7 characters, got {}", prefix.len());
+    assert!(
+        prefix.len() <= 7,
+        "prefix must be at most 7 characters, got {}",
+        prefix.len()
+    );
 }
 
 #[test]
@@ -292,5 +324,8 @@ fn item_with_status(id: &str, status: &str) -> HandoffItem {
 }
 
 fn handoff_with_items(items: Vec<HandoffItem>) -> Handoff {
-    Handoff { items, ..Handoff::default() }
+    Handoff {
+        items,
+        ..Handoff::default()
+    }
 }

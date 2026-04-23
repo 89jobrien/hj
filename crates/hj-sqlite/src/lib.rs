@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
-use hj_core::Handoff;
+use hj_core::{Handoff, LogEntry};
 use rusqlite::{Connection, params, params_from_iter};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -137,6 +137,52 @@ impl HandoffDb {
             .with_context(|| format!("failed to open {}", self.db_path.display()))
     }
 
+    pub fn log_append(
+        &self,
+        project: &str,
+        date: &str,
+        summary: &str,
+        commits: &[String],
+    ) -> Result<()> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+        let commits_json =
+            serde_json::to_string(commits).context("failed to serialize commits to JSON")?;
+        connection.execute(
+            "INSERT INTO log (project, date, summary, commits) VALUES (?1, ?2, ?3, ?4)",
+            params![project, date, summary, commits_json],
+        )?;
+        Ok(())
+    }
+
+    pub fn log_query(&self, project: &str) -> Result<Vec<LogEntry>> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+
+        let mut statement = connection.prepare(
+            "SELECT date, summary, commits FROM log WHERE project = ?1 ORDER BY id DESC",
+        )?;
+        let rows = statement.query_map(params![project], |row| {
+            let date: String = row.get(0)?;
+            let summary: String = row.get(1)?;
+            let commits_json: String = row.get(2)?;
+            Ok((date, summary, commits_json))
+        })?;
+
+        let mut entries = Vec::new();
+        for row in rows {
+            let (date, summary, commits_json) = row?;
+            let commits: Vec<String> = serde_json::from_str(&commits_json).unwrap_or_default();
+            entries.push(LogEntry {
+                date: Some(date),
+                summary,
+                commits,
+                extra: Default::default(),
+            });
+        }
+        Ok(entries)
+    }
+
     fn init_schema(connection: &Connection) -> Result<()> {
         connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS items (
@@ -148,6 +194,14 @@ impl HandoffDb {
                 completed TEXT,
                 updated   TEXT,
                 PRIMARY KEY (project, id)
+            );
+            CREATE TABLE IF NOT EXISTS log (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                project    TEXT NOT NULL,
+                date       TEXT NOT NULL,
+                summary    TEXT NOT NULL,
+                commits    TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT DEFAULT (datetime('now'))
             );",
         )?;
         Ok(())
@@ -423,6 +477,56 @@ mod tests {
                 updated: "2026-04-16".into(),
             }]
         );
+    }
+
+    #[test]
+    fn log_append_and_query_round_trip() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+
+        // Insert older entry first, then newer — DESC by id means last-appended first.
+        db.log_append("hj", "2026-04-21", "previous session", &[])
+            .expect("log_append first");
+        db.log_append(
+            "hj",
+            "2026-04-22",
+            "wired log persistence",
+            &["abc1234".to_string()],
+        )
+        .expect("log_append second");
+
+        let entries = db.log_query("hj").expect("log_query");
+        assert_eq!(entries.len(), 2);
+        // last-appended (highest id) first
+        assert_eq!(entries[0].date.as_deref(), Some("2026-04-22"));
+        assert_eq!(entries[0].summary, "wired log persistence");
+        assert_eq!(entries[0].commits, vec!["abc1234".to_string()]);
+        assert_eq!(entries[1].date.as_deref(), Some("2026-04-21"));
+        assert_eq!(entries[1].commits, Vec::<String>::new());
+    }
+
+    #[test]
+    fn log_query_returns_empty_for_unknown_project() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+
+        let entries = db.log_query("no-such-project").expect("log_query");
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn log_query_scoped_to_project() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+
+        db.log_append("hj", "2026-04-22", "hj session", &[])
+            .expect("hj log");
+        db.log_append("other", "2026-04-22", "other session", &[])
+            .expect("other log");
+
+        let hj_entries = db.log_query("hj").expect("hj query");
+        assert_eq!(hj_entries.len(), 1);
+        assert_eq!(hj_entries[0].summary, "hj session");
     }
 
     #[test]

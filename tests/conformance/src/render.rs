@@ -44,7 +44,10 @@ fn s5_1_contains_items_and_log_sections() {
 #[test]
 fn s5_1_unknown_fallback_when_state_is_none() {
     let rendered = render_markdown(&Handoff::default(), None);
-    assert!(rendered.contains("unknown"), "missing state must render 'unknown'");
+    assert!(
+        rendered.contains("unknown"),
+        "missing state must render 'unknown'"
+    );
 }
 
 // §5.2 — item sort order
@@ -99,7 +102,10 @@ fn s5_2_done_items_excluded() {
     };
     let rendered = render_markdown(&handoff, None);
     assert!(rendered.contains("Visible"));
-    assert!(!rendered.contains("Hidden"), "done items must not appear in rendered output");
+    assert!(
+        !rendered.contains("Hidden"),
+        "done items must not appear in rendered output"
+    );
 }
 
 // §5.3 — render_handover_markdown structure
@@ -206,7 +212,10 @@ fn s5_4_log_capped_at_five_entries() {
         ..Handoff::default()
     };
     let rendered = render_markdown(&handoff, None);
-    assert!(!rendered.contains("Entry 6"), "log must be capped at 5 entries");
+    assert!(
+        !rendered.contains("Entry 6"),
+        "log must be capped at 5 entries"
+    );
     assert!(!rendered.contains("Entry 7"));
 }
 

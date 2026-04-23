@@ -38,7 +38,10 @@ fn s3_2_deduplicates_exact_match() {
 #[test]
 fn s3_2_drops_empty_strings() {
     let result = unique_titles(vec!["A".into(), String::new(), "B".into()]);
-    assert!(!result.contains(&String::new()), "empty string must be dropped");
+    assert!(
+        !result.contains(&String::new()),
+        "empty string must be dropped"
+    );
 }
 
 #[test]

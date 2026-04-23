@@ -10,3 +10,7 @@
 .ctx/HANDOFF.hj.hj.state.yaml
 .ctx/.initialized
 # handoff-end
+.superpowers/
+
+*.md
+!README.md
