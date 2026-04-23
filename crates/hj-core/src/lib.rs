@@ -1,6 +1,29 @@
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+fn deserialize_commits<'de, D>(de: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Vec::<serde_yaml::Value>::deserialize(de)?
+        .into_iter()
+        .map(|v| {
+            #[derive(Deserialize)]
+            #[serde(untagged)]
+            enum CommitEntry {
+                Sha(String),
+                Object { sha: String },
+            }
+            serde_yaml::from_value::<CommitEntry>(v)
+                .map(|c| match c {
+                    CommitEntry::Sha(s) => s,
+                    CommitEntry::Object { sha } => sha,
+                })
+                .map_err(serde::de::Error::custom)
+        })
+        .collect()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Handoff {
@@ -67,7 +90,7 @@ pub struct LogEntry {
     pub date: Option<String>,
     #[serde(default)]
     pub summary: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_commits")]
     pub commits: Vec<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, serde_yaml::Value>,
@@ -458,6 +481,28 @@ mod tests {
         assert_eq!(sync.report.captured_count, 2);
         assert_eq!(sync.report.created_count, 1);
         assert!(sync.report.not_captured.is_empty());
+    }
+
+    #[test]
+    fn log_commits_accept_bare_sha_and_object_form() {
+        let yaml = r#"
+log:
+  - date: "20260422:120000"
+    summary: bare sha form
+    commits:
+      - abc1234
+      - def5678
+  - date: "20260422:130000"
+    summary: object form
+    commits:
+      - sha: aaa1111
+        branch: main
+      - sha: bbb2222
+        branch: main
+"#;
+        let handoff: Handoff = serde_yaml::from_str(yaml).expect("parse");
+        assert_eq!(handoff.log[0].commits, vec!["abc1234", "def5678"]);
+        assert_eq!(handoff.log[1].commits, vec!["aaa1111", "bbb2222"]);
     }
 
     #[test]
