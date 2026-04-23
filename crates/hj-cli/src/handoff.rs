@@ -433,7 +433,7 @@ fn reconcile_handoff(
 
 fn append_jsonl_log(project: &str, date: &str, summary: &str, commits: &[String]) -> Result<()> {
     let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
-    let log_path = home.join(".local/share/atelier/handoff-log.jsonl");
+    let log_path = home.join(".ctx/handoff-log.jsonl");
     if let Some(parent) = log_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;

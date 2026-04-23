@@ -40,7 +40,7 @@ impl HandoffDb {
     pub fn new() -> Result<Self> {
         let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
         Ok(Self {
-            db_path: home.join(".local/share/atelier/handoff.db"),
+            db_path: home.join(".ctx/handoff.db"),
         })
     }
 
