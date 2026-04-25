@@ -367,7 +367,7 @@ pub fn is_ignored_dir(path: &Path) -> bool {
     )
 }
 
-fn git_output<I, S>(cwd: &Path, args: I) -> Result<String>
+pub fn git_output<I, S>(cwd: &Path, args: I) -> Result<String>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,

@@ -15,8 +15,4 @@ anyhow.workspace = true
 hj-core = { version = "0.1.2", path = "../hj-core" }
 serde_json.workspace = true
 serde_yaml.workspace = true
-toml.workspace = true
 walkdir.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
