@@ -86,6 +86,7 @@ pub(crate) fn refresh(args: RefreshArgs) -> Result<()> {
 pub(crate) fn handon(args: TargetArgs) -> Result<()> {
     let context = discover(Path::new("."))?;
     let (paths, mut handoff) = load_target_handoff(&context, args, false)?;
+    auto_upsert(&paths.project, &handoff);
     apply_sqlite_overrides(&paths.project, &mut handoff)?;
     apply_db_log(&paths.project, &mut handoff);
     let state = load_state(&paths.state_path)?;
@@ -138,6 +139,7 @@ pub(crate) fn handon(args: TargetArgs) -> Result<()> {
 pub(crate) fn handover(args: TargetArgs) -> Result<()> {
     let context = discover(Path::new("."))?;
     let (paths, mut handoff) = load_target_handoff(&context, args, false)?;
+    auto_upsert(&paths.project, &handoff);
     apply_sqlite_overrides(&paths.project, &mut handoff)?;
     apply_db_log(&paths.project, &mut handoff);
     let state = load_state(&paths.state_path)?;
@@ -197,6 +199,7 @@ pub(crate) fn reconcile(args: TargetArgs, mode: ReconcileMode) -> Result<()> {
     let doob = DoobClient::new(&context.repo_root);
     ensure_doob_on_path(&context.repo_root)?;
     let (paths, handoff) = load_target_handoff(&context, args, false)?;
+    auto_upsert(&paths.project, &handoff);
     let report = reconcile_handoff(&doob, &paths.project, &handoff, mode)?;
     print_reconcile_report(mode, &report);
 
@@ -337,8 +340,9 @@ fn load_target_handoff(
     if handoff_path.exists() {
         let contents = fs::read_to_string(&handoff_path)
             .with_context(|| format!("failed to read {}", handoff_path.display()))?;
-        let handoff: Handoff = serde_yaml::from_str(&contents)
+        let mut handoff: Handoff = serde_yaml::from_str(&contents)
             .with_context(|| format!("failed to parse {}", handoff_path.display()))?;
+        validate_and_repair(&mut handoff, &handoff_path)?;
         let resolved = rebind_paths_for_handoff(paths, &handoff_path, &handoff)?;
         return Ok((resolved, handoff));
     }
@@ -346,8 +350,9 @@ fn load_target_handoff(
     if let Some(migrated) = context.migrate_root_handoff(&handoff_path)? {
         let contents = fs::read_to_string(&migrated)
             .with_context(|| format!("failed to read {}", migrated.display()))?;
-        let handoff: Handoff = serde_yaml::from_str(&contents)
+        let mut handoff: Handoff = serde_yaml::from_str(&contents)
             .with_context(|| format!("failed to parse {}", migrated.display()))?;
+        validate_and_repair(&mut handoff, &migrated)?;
         let resolved = rebind_paths_for_handoff(paths, &migrated, &handoff)?;
         return Ok((resolved, handoff));
     }
@@ -363,6 +368,31 @@ fn load_target_handoff(
     }
 
     bail!("handoff file not found: {}", handoff_path.display())
+}
+
+fn validate_and_repair(handoff: &mut Handoff, handoff_path: &Path) -> Result<()> {
+    let warnings = handoff.validate();
+    for w in &warnings {
+        eprintln!("warning: {}: {w}", handoff_path.display());
+    }
+
+    let repairs = handoff.repair();
+    if !repairs.is_empty() {
+        for r in &repairs {
+            eprintln!("repaired: {}: {r}", handoff_path.display());
+        }
+        fs::write(handoff_path, serde_yaml::to_string(handoff)?)
+            .with_context(|| format!("failed to write repaired {}", handoff_path.display()))?;
+    }
+    Ok(())
+}
+
+fn auto_upsert(project: &str, handoff: &Handoff) {
+    let Ok(db) = HandoffDb::new() else { return };
+    let Ok(date) = today(Path::new(".")) else { return };
+    if let Err(e) = db.upsert(project, handoff, &date) {
+        eprintln!("warning: db upsert failed: {e}");
+    }
 }
 
 fn rebind_paths_for_handoff(
@@ -592,14 +622,14 @@ fn print_list(label: &str, items: &[String]) {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     use hj_core::{ExtraEntry, Handoff, HandoffItem, HandoffPaths};
     use hj_sqlite::HandoffRow;
 
     use super::{
         apply_handoff_rows, collect_review_on_wake, project_from_handoff_path,
-        rebind_paths_for_handoff,
+        rebind_paths_for_handoff, validate_and_repair,
     };
 
     #[test]
@@ -680,6 +710,26 @@ mod tests {
             rebound.state_path,
             PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.state.json")
         );
+    }
+
+    #[test]
+    fn validate_and_repair_infers_priority_and_writes_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("HANDOFF.test.test.yaml");
+        let handoff_yaml = "project: test\nitems:\n  - id: t-1\n    title: Fix broken CI\n    status: open\n";
+        fs::write(&path, handoff_yaml).unwrap();
+
+        let mut handoff: Handoff = serde_yaml::from_str(handoff_yaml).unwrap();
+        assert!(handoff.items[0].priority.is_none());
+
+        validate_and_repair(&mut handoff, &path).unwrap();
+
+        // Priority should be inferred
+        assert_eq!(handoff.items[0].priority.as_deref(), Some("P0"));
+        // File should be rewritten
+        let reloaded: Handoff =
+            serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(reloaded.items[0].priority.as_deref(), Some("P0"));
     }
 
     #[test]
