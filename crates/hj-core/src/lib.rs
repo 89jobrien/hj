@@ -1,3 +1,9 @@
+pub mod detect;
+
+pub use detect::{
+    HandoffPaths, RefreshReport, RepoContext, branch_name, current_short_head, discover, today,
+};
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
