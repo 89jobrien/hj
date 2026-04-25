@@ -281,8 +281,13 @@ dependencies = [
 name = "hj-core"
 version = "0.1.2"
 dependencies = [
+ "anyhow",
  "serde",
+ "serde_json",
  "serde_yaml",
+ "tempfile",
+ "toml",
+ "walkdir",
 ]
 
 [[package]]
@@ -303,8 +308,6 @@ dependencies = [
  "hj-core",
  "serde_json",
  "serde_yaml",
- "tempfile",
- "toml",
  "walkdir",
 ]
 

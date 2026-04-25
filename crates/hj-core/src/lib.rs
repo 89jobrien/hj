@@ -5,6 +5,7 @@ pub use detect::{
 };
 
 use std::collections::BTreeMap;
+use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -29,6 +30,37 @@ where
                 .map_err(serde::de::Error::custom)
         })
         .collect()
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum ValidationWarning {
+    /// An item is missing its `id` field
+    ItemMissingId { index: usize, title: String },
+    /// An item looks like a log entry (has date/summary/commits but no meaningful item fields)
+    LogEntryInItems { index: usize, date: String },
+    /// A log entry is missing its summary
+    LogEntryMissingSummary { index: usize },
+    /// Duplicate item id
+    DuplicateItemId { id: String, indices: Vec<usize> },
+}
+
+impl fmt::Display for ValidationWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidationWarning::ItemMissingId { index, title } => {
+                write!(f, "items[{index}]: missing id field (title: '{title}')")
+            }
+            ValidationWarning::LogEntryInItems { index, date } => {
+                write!(f, "items[{index}]: looks like a log entry (date: {date})")
+            }
+            ValidationWarning::LogEntryMissingSummary { index } => {
+                write!(f, "log[{index}]: missing summary")
+            }
+            ValidationWarning::DuplicateItemId { id, indices } => {
+                write!(f, "duplicate item id '{id}' at indices {indices:?}")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -203,6 +235,134 @@ impl Handoff {
         if self.project.as_deref().unwrap_or_default().is_empty() {
             self.project = Some(project.to_string());
         }
+    }
+
+    pub fn validate(&self) -> Vec<ValidationWarning> {
+        let mut warnings = Vec::new();
+
+        // Check items
+        let mut id_positions: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        for (i, item) in self.items.iter().enumerate() {
+            if item.id.is_empty() {
+                if Self::looks_like_log_entry(item) {
+                    let date = item
+                        .extra_fields
+                        .get("date")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    warnings.push(ValidationWarning::LogEntryInItems { index: i, date });
+                } else {
+                    warnings.push(ValidationWarning::ItemMissingId {
+                        index: i,
+                        title: item.title.clone(),
+                    });
+                }
+            } else {
+                id_positions
+                    .entry(item.id.clone())
+                    .or_default()
+                    .push(i);
+            }
+        }
+
+        for (id, indices) in id_positions {
+            if indices.len() > 1 {
+                warnings.push(ValidationWarning::DuplicateItemId { id, indices });
+            }
+        }
+
+        // Check log entries
+        for (i, entry) in self.log.iter().enumerate() {
+            if entry.summary.is_empty() {
+                warnings.push(ValidationWarning::LogEntryMissingSummary { index: i });
+            }
+        }
+
+        warnings
+    }
+
+    pub fn repair(&mut self) -> Vec<String> {
+        let mut descriptions = Vec::new();
+        let mut kept_items = Vec::new();
+
+        for (i, item) in self.items.drain(..).enumerate() {
+            if Self::looks_like_log_entry(&item) {
+                let date = item
+                    .extra_fields
+                    .get("date")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let summary = item
+                    .extra_fields
+                    .get("summary")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let commits = item
+                    .extra_fields
+                    .get("commits")
+                    .and_then(|v| v.as_sequence())
+                    .map(|seq| {
+                        seq.iter()
+                            .filter_map(|v| match v {
+                                serde_yaml::Value::String(s) => Some(s.clone()),
+                                serde_yaml::Value::Mapping(m) => m
+                                    .get(serde_yaml::Value::String("sha".into()))
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+
+                let mut extra = BTreeMap::new();
+                for (k, v) in &item.extra_fields {
+                    if k != "date" && k != "summary" && k != "commits" {
+                        extra.insert(k.clone(), v.clone());
+                    }
+                }
+
+                let date_str = date
+                    .as_deref()
+                    .unwrap_or("unknown")
+                    .to_string();
+                descriptions.push(format!(
+                    "moved log entry (date: {date_str}) from items[{i}] to log"
+                ));
+
+                self.log.push(LogEntry {
+                    date,
+                    summary,
+                    commits,
+                    extra,
+                });
+            } else {
+                kept_items.push(item);
+            }
+        }
+
+        self.items = kept_items;
+
+        // Sort log by date descending
+        self.log.sort_by(|a, b| {
+            let da = a.date.as_deref().unwrap_or("");
+            let db = b.date.as_deref().unwrap_or("");
+            db.cmp(da)
+        });
+
+        descriptions
+    }
+
+    fn looks_like_log_entry(item: &HandoffItem) -> bool {
+        if !item.id.is_empty() {
+            return false;
+        }
+        if item.extra_fields.contains_key("date") {
+            return true;
+        }
+        item.extra_fields.contains_key("summary") && item.extra_fields.contains_key("commits")
     }
 
     pub fn ensure_id_prefix(&mut self, project: &str) {
@@ -400,9 +560,11 @@ fn contains_any(existing: &[String], item: &HandoffItem) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        Handoff, HandoffItem, HandoffState, ReconcileMode, TodoSnapshot, build_reconcile_plan,
-        default_id_prefix, infer_priority, sanitize_name, titleize_slug,
+        Handoff, HandoffItem, HandoffState, LogEntry, ReconcileMode, TodoSnapshot,
+        ValidationWarning, build_reconcile_plan, default_id_prefix, infer_priority, sanitize_name,
+        titleize_slug,
     };
+    use std::collections::BTreeMap;
 
     #[test]
     fn sanitize_project_name() {
@@ -509,6 +671,196 @@ log:
         let handoff: Handoff = serde_yaml::from_str(yaml).expect("parse");
         assert_eq!(handoff.log[0].commits, vec!["abc1234", "def5678"]);
         assert_eq!(handoff.log[1].commits, vec!["aaa1111", "bbb2222"]);
+    }
+
+    #[test]
+    fn validate_catches_item_missing_id() {
+        let handoff = Handoff {
+            items: vec![HandoffItem {
+                id: String::new(),
+                title: "some task".into(),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+        let warnings = handoff.validate();
+        assert_eq!(
+            warnings,
+            vec![ValidationWarning::ItemMissingId {
+                index: 0,
+                title: "some task".into()
+            }]
+        );
+    }
+
+    #[test]
+    fn validate_catches_log_entry_in_items() {
+        let mut extra_fields = BTreeMap::new();
+        extra_fields.insert(
+            "date".into(),
+            serde_yaml::Value::String("20260424:152652".into()),
+        );
+        extra_fields.insert(
+            "summary".into(),
+            serde_yaml::Value::String("did stuff".into()),
+        );
+        let handoff = Handoff {
+            items: vec![HandoffItem {
+                id: String::new(),
+                extra_fields,
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+        let warnings = handoff.validate();
+        assert!(warnings.contains(&ValidationWarning::LogEntryInItems {
+            index: 0,
+            date: "20260424:152652".into()
+        }));
+    }
+
+    #[test]
+    fn validate_catches_duplicate_item_ids() {
+        let handoff = Handoff {
+            items: vec![
+                HandoffItem {
+                    id: "hj-1".into(),
+                    title: "first".into(),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-2".into(),
+                    title: "unique".into(),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-1".into(),
+                    title: "duplicate".into(),
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+        let warnings = handoff.validate();
+        assert!(warnings.contains(&ValidationWarning::DuplicateItemId {
+            id: "hj-1".into(),
+            indices: vec![0, 2]
+        }));
+    }
+
+    #[test]
+    fn validate_catches_log_entry_missing_summary() {
+        let handoff = Handoff {
+            log: vec![LogEntry {
+                date: Some("20260424:152652".into()),
+                summary: String::new(),
+                ..LogEntry::default()
+            }],
+            ..Handoff::default()
+        };
+        let warnings = handoff.validate();
+        assert_eq!(
+            warnings,
+            vec![ValidationWarning::LogEntryMissingSummary { index: 0 }]
+        );
+    }
+
+    #[test]
+    fn validate_clean_handoff_returns_empty() {
+        let handoff = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                title: "valid".into(),
+                ..HandoffItem::default()
+            }],
+            log: vec![LogEntry {
+                date: Some("20260424:152652".into()),
+                summary: "did things".into(),
+                ..LogEntry::default()
+            }],
+            ..Handoff::default()
+        };
+        assert!(handoff.validate().is_empty());
+    }
+
+    #[test]
+    fn repair_moves_log_entries_from_items_to_log() {
+        let mut extra_fields = BTreeMap::new();
+        extra_fields.insert(
+            "date".into(),
+            serde_yaml::Value::String("20260424:152652".into()),
+        );
+        extra_fields.insert(
+            "summary".into(),
+            serde_yaml::Value::String("did stuff".into()),
+        );
+        extra_fields.insert(
+            "commits".into(),
+            serde_yaml::Value::Sequence(vec![serde_yaml::Value::String("abc123".into())]),
+        );
+        let mut handoff = Handoff {
+            items: vec![
+                HandoffItem {
+                    id: "hj-1".into(),
+                    title: "valid".into(),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: String::new(),
+                    extra_fields,
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+        let descriptions = handoff.repair();
+        assert_eq!(handoff.items.len(), 1);
+        assert_eq!(handoff.items[0].id, "hj-1");
+        assert_eq!(handoff.log.len(), 1);
+        assert_eq!(handoff.log[0].date.as_deref(), Some("20260424:152652"));
+        assert_eq!(handoff.log[0].summary, "did stuff");
+        assert_eq!(handoff.log[0].commits, vec!["abc123".to_string()]);
+        assert!(!descriptions.is_empty());
+    }
+
+    #[test]
+    fn repair_preserves_valid_items() {
+        let mut handoff = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                title: "valid".into(),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+        let descriptions = handoff.repair();
+        assert_eq!(handoff.items.len(), 1);
+        assert!(descriptions.is_empty());
+    }
+
+    #[test]
+    fn repair_returns_descriptions() {
+        let mut extra_fields = BTreeMap::new();
+        extra_fields.insert(
+            "date".into(),
+            serde_yaml::Value::String("20260424:152652".into()),
+        );
+        extra_fields.insert(
+            "summary".into(),
+            serde_yaml::Value::String("work".into()),
+        );
+        let mut handoff = Handoff {
+            items: vec![HandoffItem {
+                id: String::new(),
+                extra_fields,
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+        let descriptions = handoff.repair();
+        assert_eq!(descriptions.len(), 1);
+        assert!(descriptions[0].contains("20260424:152652"));
+        assert!(descriptions[0].contains("items[0]"))
     }
 
     #[test]
