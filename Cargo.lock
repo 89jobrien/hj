@@ -275,6 +275,7 @@ dependencies = [
  "hj-sqlite",
  "serde_json",
  "serde_yaml",
+ "tempfile",
 ]
 
 [[package]]

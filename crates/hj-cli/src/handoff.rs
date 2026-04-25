@@ -633,6 +633,80 @@ mod tests {
     };
 
     #[test]
+    fn validate_and_repair_fixes_log_entry_in_items_and_rewrites_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("HANDOFF.test.yaml");
+
+        // A handoff with a log entry misplaced in items
+        let mut extra_fields = std::collections::BTreeMap::new();
+        extra_fields.insert(
+            "date".into(),
+            serde_yaml::Value::String("20260425:100000".into()),
+        );
+        extra_fields.insert(
+            "summary".into(),
+            serde_yaml::Value::String("did stuff".into()),
+        );
+        let mut handoff = Handoff {
+            items: vec![
+                HandoffItem {
+                    id: "hj-1".into(),
+                    title: "valid item".into(),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: String::new(),
+                    extra_fields,
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+
+        fs::write(&path, serde_yaml::to_string(&handoff).unwrap()).unwrap();
+
+        validate_and_repair(&mut handoff, &path).unwrap();
+
+        // Log entry moved out of items
+        assert_eq!(handoff.items.len(), 1);
+        assert_eq!(handoff.items[0].id, "hj-1");
+        assert_eq!(handoff.log.len(), 1);
+        assert_eq!(handoff.log[0].summary, "did stuff");
+
+        // File was rewritten
+        let on_disk: Handoff =
+            serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(on_disk.items.len(), 1);
+        assert_eq!(on_disk.log.len(), 1);
+    }
+
+    #[test]
+    fn validate_and_repair_noop_on_clean_handoff() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("HANDOFF.test.yaml");
+
+        let mut handoff = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                title: "valid".into(),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        let yaml = serde_yaml::to_string(&handoff).unwrap();
+        fs::write(&path, &yaml).unwrap();
+
+        validate_and_repair(&mut handoff, &path).unwrap();
+
+        // Nothing changed
+        assert_eq!(handoff.items.len(), 1);
+        assert!(handoff.log.is_empty());
+        // File untouched
+        assert_eq!(fs::read_to_string(&path).unwrap(), yaml);
+    }
+
+    #[test]
     fn sqlite_rows_override_handoff_status() {
         let mut handoff = Handoff {
             items: vec![HandoffItem {
