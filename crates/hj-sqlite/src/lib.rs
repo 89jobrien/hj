@@ -11,6 +11,7 @@ pub struct HandoffRow {
     pub status: String,
     pub completed: String,
     pub updated: String,
+    pub issue: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,12 +63,13 @@ impl HandoffDb {
         let mut synced = 0usize;
         for item in &handoff.items {
             transaction.execute(
-                "INSERT INTO items (project, id, name, priority, status, completed, updated)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                "INSERT INTO items (project, id, name, priority, status, completed, updated, issue)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                  ON CONFLICT(project, id) DO UPDATE SET
                     status = excluded.status,
                     completed = excluded.completed,
-                    updated = excluded.updated",
+                    updated = excluded.updated,
+                    issue = excluded.issue",
                 params![
                     project,
                     item.id,
@@ -76,6 +78,7 @@ impl HandoffDb {
                     item.status.as_deref().unwrap_or_default(),
                     item.completed.as_deref().unwrap_or_default(),
                     today,
+                    item.issue,
                 ],
             )?;
             synced += 1;
@@ -95,18 +98,20 @@ impl HandoffDb {
 
         let mut statement = connection.prepare(
             "SELECT id, coalesce(priority, ''), coalesce(status, ''), coalesce(completed, ''),
-                    coalesce(updated, '')
+                    coalesce(updated, ''), issue
              FROM items
              WHERE project = ?1
              ORDER BY priority, id",
         )?;
         let rows = statement.query_map(params![project], |row| {
+            let issue_val: Option<i64> = row.get(5)?;
             Ok(HandoffRow {
                 id: row.get(0)?,
                 priority: row.get(1)?,
                 status: row.get(2)?,
                 completed: row.get(3)?,
                 updated: row.get(4)?,
+                issue: issue_val.map(|v| v as u64),
             })
         })?;
 
@@ -193,6 +198,7 @@ impl HandoffDb {
                 status    TEXT,
                 completed TEXT,
                 updated   TEXT,
+                issue     INTEGER,
                 PRIMARY KEY (project, id)
             );
             CREATE TABLE IF NOT EXISTS log (
@@ -204,6 +210,13 @@ impl HandoffDb {
                 created_at TEXT DEFAULT (datetime('now'))
             );",
         )?;
+        // Migration: add issue column to existing databases that lack it.
+        let has_issue: bool = connection
+            .prepare("SELECT 1 FROM pragma_table_info('items') WHERE name = 'issue'")?
+            .exists([])?;
+        if !has_issue {
+            connection.execute_batch("ALTER TABLE items ADD COLUMN issue INTEGER;")?;
+        }
         Ok(())
     }
 
@@ -349,6 +362,7 @@ mod tests {
                     status: "blocked".into(),
                     completed: String::new(),
                     updated: "2026-04-16".into(),
+                    issue: None,
                 },
                 HandoffRow {
                     id: "hj-2".into(),
@@ -356,6 +370,7 @@ mod tests {
                     status: "open".into(),
                     completed: String::new(),
                     updated: "2026-04-16".into(),
+                    issue: None,
                 },
             ]
         );
@@ -433,6 +448,7 @@ mod tests {
                 status: "blocked".into(),
                 completed: String::new(),
                 updated: "2026-04-17".into(),
+                issue: None,
             }]
         );
     }
@@ -475,6 +491,7 @@ mod tests {
                 status: "open".into(),
                 completed: String::new(),
                 updated: "2026-04-16".into(),
+                issue: None,
             }]
         );
     }

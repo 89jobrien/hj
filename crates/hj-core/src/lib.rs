@@ -98,6 +98,8 @@ pub struct HandoffItem {
     pub files: Vec<String>,
     #[serde(default)]
     pub completed: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issue: Option<u64>,
     #[serde(default)]
     pub extra: Vec<ExtraEntry>,
     #[serde(flatten)]

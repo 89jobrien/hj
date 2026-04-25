@@ -363,7 +363,7 @@ pub fn write_gitignore_block(repo_root: &Path) -> Result<()> {
 pub fn is_ignored_dir(path: &Path) -> bool {
     matches!(
         path.file_name().and_then(OsStr::to_str),
-        Some(".git" | "target" | "vendor" | "__pycache__" | "worktrees" | ".tmp-dogfood")
+        Some(".git" | "target" | "vendor" | "__pycache__" | "worktrees" | ".tmp-dogfood" | "examples")
     )
 }
 

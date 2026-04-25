@@ -6,7 +6,7 @@ items:
   doob_uuid: null
   name: null
   priority: P2
-  status: open
+  status: closed
   title: Improve hj-cli terminal output formatting
   description: |
     Replace markdown-style headers in handon output, align close/reconcile label columns, style triage buckets with Unicode separators, fix db query column alignment. No new deps — plain format strings only.

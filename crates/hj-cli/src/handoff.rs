@@ -1,4 +1,4 @@
-use std::{fs, io::Write, path::Path, process};
+use std::{fs, io::Write, path::Path, process, process::Command};
 
 use anyhow::{Context, Result, anyhow, bail};
 use hj_core::{
@@ -390,8 +390,73 @@ fn validate_and_repair(handoff: &mut Handoff, handoff_path: &Path) -> Result<()>
 fn auto_upsert(project: &str, handoff: &Handoff) {
     let Ok(db) = HandoffDb::new() else { return };
     let Ok(date) = today(Path::new(".")) else { return };
+    let old_rows = db.query(project).unwrap_or_default();
     if let Err(e) = db.upsert(project, handoff, &date) {
         eprintln!("warning: db upsert failed: {e}");
+        return;
+    }
+    sync_github_issues(&old_rows, handoff);
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum IssueAction {
+    Close(u64),
+    Reopen(u64),
+}
+
+fn detect_issue_transitions(old_rows: &[HandoffRow], handoff: &Handoff) -> Vec<IssueAction> {
+    let mut actions = Vec::new();
+    for item in &handoff.items {
+        let Some(issue_num) = item.issue else {
+            continue;
+        };
+        let new_status = item.status.as_deref().unwrap_or("open");
+        let old_status = old_rows
+            .iter()
+            .find(|r| r.id == item.id)
+            .map(|r| r.status.as_str())
+            .unwrap_or("open");
+
+        if old_status == new_status {
+            continue;
+        }
+
+        let is_closed = matches!(new_status, "closed" | "done");
+        let was_closed = matches!(old_status, "closed" | "done");
+
+        if is_closed && !was_closed {
+            actions.push(IssueAction::Close(issue_num));
+        } else if !is_closed && was_closed {
+            actions.push(IssueAction::Reopen(issue_num));
+        }
+    }
+    actions
+}
+
+fn sync_github_issues(old_rows: &[HandoffRow], handoff: &Handoff) {
+    for action in detect_issue_transitions(old_rows, handoff) {
+        match action {
+            IssueAction::Close(n) => gh_issue_action(n, "close"),
+            IssueAction::Reopen(n) => gh_issue_action(n, "reopen"),
+        }
+    }
+}
+
+fn gh_issue_action(issue: u64, action: &str) {
+    let result = Command::new("gh")
+        .args(["issue", action, &issue.to_string()])
+        .output();
+    match result {
+        Ok(output) if output.status.success() => {
+            eprintln!("gh: issue #{issue} {action}d");
+        }
+        Ok(output) => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            eprintln!("warning: gh issue {action} #{issue} failed: {stderr}");
+        }
+        Err(e) => {
+            eprintln!("warning: gh not available: {e}");
+        }
     }
 }
 
@@ -628,8 +693,8 @@ mod tests {
     use hj_sqlite::HandoffRow;
 
     use super::{
-        apply_handoff_rows, collect_review_on_wake, project_from_handoff_path,
-        rebind_paths_for_handoff, validate_and_repair,
+        IssueAction, apply_handoff_rows, collect_review_on_wake, detect_issue_transitions,
+        project_from_handoff_path, rebind_paths_for_handoff, validate_and_repair,
     };
 
     #[test]
@@ -723,6 +788,7 @@ mod tests {
             status: "blocked".into(),
             completed: "2026-04-16".into(),
             updated: "2026-04-16".into(),
+            issue: None,
         }];
 
         apply_handoff_rows(&mut handoff, &rows);
@@ -792,6 +858,98 @@ mod tests {
         assert_eq!(
             project_from_handoff_path(&handoff_path, "hj").as_deref(),
             Some("hj-core")
+        );
+    }
+
+    fn row(id: &str, status: &str, issue: Option<u64>) -> HandoffRow {
+        HandoffRow {
+            id: id.into(),
+            priority: "P1".into(),
+            status: status.into(),
+            completed: String::new(),
+            updated: "2026-04-25".into(),
+            issue,
+        }
+    }
+
+    fn item(id: &str, status: &str, issue: Option<u64>) -> HandoffItem {
+        HandoffItem {
+            id: id.into(),
+            status: Some(status.into()),
+            issue,
+            ..HandoffItem::default()
+        }
+    }
+
+    #[test]
+    fn detect_close_transition() {
+        let old = vec![row("hj-1", "open", Some(42))];
+        let handoff = Handoff {
+            items: vec![item("hj-1", "closed", Some(42))],
+            ..Handoff::default()
+        };
+        assert_eq!(
+            detect_issue_transitions(&old, &handoff),
+            vec![IssueAction::Close(42)]
+        );
+    }
+
+    #[test]
+    fn detect_reopen_transition() {
+        let old = vec![row("hj-1", "closed", Some(42))];
+        let handoff = Handoff {
+            items: vec![item("hj-1", "open", Some(42))],
+            ..Handoff::default()
+        };
+        assert_eq!(
+            detect_issue_transitions(&old, &handoff),
+            vec![IssueAction::Reopen(42)]
+        );
+    }
+
+    #[test]
+    fn no_action_without_issue_number() {
+        let old = vec![row("hj-1", "open", None)];
+        let handoff = Handoff {
+            items: vec![item("hj-1", "closed", None)],
+            ..Handoff::default()
+        };
+        assert!(detect_issue_transitions(&old, &handoff).is_empty());
+    }
+
+    #[test]
+    fn no_action_when_status_unchanged() {
+        let old = vec![row("hj-1", "open", Some(42))];
+        let handoff = Handoff {
+            items: vec![item("hj-1", "open", Some(42))],
+            ..Handoff::default()
+        };
+        assert!(detect_issue_transitions(&old, &handoff).is_empty());
+    }
+
+    #[test]
+    fn done_status_triggers_close() {
+        let old = vec![row("hj-1", "open", Some(7))];
+        let handoff = Handoff {
+            items: vec![item("hj-1", "done", Some(7))],
+            ..Handoff::default()
+        };
+        assert_eq!(
+            detect_issue_transitions(&old, &handoff),
+            vec![IssueAction::Close(7)]
+        );
+    }
+
+    #[test]
+    fn new_item_with_closed_status_triggers_close() {
+        let old = vec![];
+        let handoff = Handoff {
+            items: vec![item("hj-1", "closed", Some(10))],
+            ..Handoff::default()
+        };
+        assert_eq!(
+            detect_issue_transitions(&old, &handoff),
+            vec![IssueAction::Close(10)]
         );
     }
 }
