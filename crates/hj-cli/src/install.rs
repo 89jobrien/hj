@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use hj_git::discover;
+use hj_core::discover;
 
 use crate::cli::{InstallArgs, UpdateArgs};
 

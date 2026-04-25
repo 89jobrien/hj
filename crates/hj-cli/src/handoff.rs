@@ -2,11 +2,11 @@ use std::{fs, io::Write, path::Path, process};
 
 use anyhow::{Context, Result, anyhow, bail};
 use hj_core::{
-    ExtraEntry, Handoff, HandoffItem, HandoffState, LogEntry, ReconcileMode, ReconcileReport,
-    build_reconcile_plan,
+    ExtraEntry, Handoff, HandoffItem, HandoffPaths, HandoffState, LogEntry, ReconcileMode,
+    ReconcileReport, RepoContext, branch_name, build_reconcile_plan, current_short_head, discover,
+    today,
 };
 use hj_doob::{DoobClient, ensure_doob_on_path, map_priority};
-use hj_git::{RepoContext, branch_name, current_short_head, discover, today};
 use hj_render::{render_handover_markdown, render_markdown};
 use hj_sqlite::{HandoffDb, HandoffRow};
 
@@ -287,7 +287,7 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
 
 fn build_state(
     context: &RepoContext,
-    paths: &hj_git::HandoffPaths,
+    paths: &HandoffPaths,
     build: Option<String>,
     tests: Option<String>,
     notes: Option<String>,
@@ -329,7 +329,7 @@ fn load_target_handoff(
     context: &RepoContext,
     args: TargetArgs,
     allow_create: bool,
-) -> Result<(hj_git::HandoffPaths, Handoff)> {
+) -> Result<(HandoffPaths, Handoff)> {
     let explicit_project = args.project.as_deref();
     let paths = context.paths(explicit_project)?;
     let handoff_path = args.handoff.unwrap_or_else(|| paths.handoff_path.clone());
@@ -366,10 +366,10 @@ fn load_target_handoff(
 }
 
 fn rebind_paths_for_handoff(
-    mut paths: hj_git::HandoffPaths,
+    mut paths: HandoffPaths,
     handoff_path: &Path,
     handoff: &Handoff,
-) -> Result<hj_git::HandoffPaths> {
+) -> Result<HandoffPaths> {
     let ctx_dir = handoff_path
         .parent()
         .ok_or_else(|| anyhow!("handoff path has no parent directory"))?
@@ -594,7 +594,7 @@ fn print_list(label: &str, items: &[String]) {
 mod tests {
     use std::path::PathBuf;
 
-    use hj_core::{ExtraEntry, Handoff, HandoffItem};
+    use hj_core::{ExtraEntry, Handoff, HandoffItem, HandoffPaths};
     use hj_sqlite::HandoffRow;
 
     use super::{
@@ -656,7 +656,7 @@ mod tests {
 
     #[test]
     fn explicit_handoff_path_rebinds_state_and_project() {
-        let paths = hj_git::HandoffPaths {
+        let paths = HandoffPaths {
             repo_root: PathBuf::from("/repo"),
             ctx_dir: PathBuf::from("/repo/.ctx"),
             handoff_path: PathBuf::from("/repo/.ctx/HANDOFF.hj.hj.yaml"),

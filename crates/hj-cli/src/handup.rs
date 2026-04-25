@@ -6,9 +6,8 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use hj_core::{HandupItem, HandupProject, HandupRecommendation, HandupReport};
-use hj_git::{
-    SurveyHandoff, TodoMarker, discover, discover_handoffs, discover_todo_markers, today,
-};
+use hj_core::{discover, today};
+use hj_git::{SurveyHandoff, TodoMarker, discover_handoffs, discover_todo_markers};
 use hj_sqlite::{HandupCheckpoint, HandupDb};
 
 use crate::cli::HandupArgs;
