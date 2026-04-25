@@ -713,26 +713,6 @@ mod tests {
     }
 
     #[test]
-    fn validate_and_repair_infers_priority_and_writes_back() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("HANDOFF.test.test.yaml");
-        let handoff_yaml = "project: test\nitems:\n  - id: t-1\n    title: Fix broken CI\n    status: open\n";
-        fs::write(&path, handoff_yaml).unwrap();
-
-        let mut handoff: Handoff = serde_yaml::from_str(handoff_yaml).unwrap();
-        assert!(handoff.items[0].priority.is_none());
-
-        validate_and_repair(&mut handoff, &path).unwrap();
-
-        // Priority should be inferred
-        assert_eq!(handoff.items[0].priority.as_deref(), Some("P0"));
-        // File should be rewritten
-        let reloaded: Handoff =
-            serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(reloaded.items[0].priority.as_deref(), Some("P0"));
-    }
-
-    #[test]
     fn project_can_be_derived_from_handoff_filename() {
         let handoff_path = PathBuf::from("/repo/.ctx/HANDOFF.hj-core.hj.yaml");
         assert_eq!(

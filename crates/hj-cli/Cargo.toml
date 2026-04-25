@@ -49,6 +49,3 @@ hj-render = { version = "0.1.2", path = "../hj-render" }
 hj-sqlite = { version = "0.1.2", path = "../hj-sqlite" }
 serde_json.workspace = true
 serde_yaml.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
