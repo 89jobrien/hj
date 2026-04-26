@@ -15,3 +15,5 @@
 
 *.md
 !README.md
+!CLAUDE.md
+!AGENTS.md

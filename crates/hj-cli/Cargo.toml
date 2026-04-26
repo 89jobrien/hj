@@ -38,6 +38,11 @@ path = "src/bin/handoff-db.rs"
 name = "handup"
 path = "src/bin/handup.rs"
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true

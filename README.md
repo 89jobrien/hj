@@ -4,58 +4,58 @@
 
 ## Workspace Crates
 
-| Crate | Purpose | README |
-|---|---|---|
-| `hj-cli` | Top-level CLI and installed binaries | [`crates/hj-cli/README.md`](./crates/hj-cli/README.md) |
-| `hj-core` | Shared handoff and handup data types plus priority/title helpers | [`crates/hj-core/README.md`](./crates/hj-core/README.md) |
-| `hj-doob` | `doob` reconciliation helpers and priority mapping | [`crates/hj-doob/README.md`](./crates/hj-doob/README.md) |
-| `hj-git` | Repo discovery, `.ctx` scaffolding, handoff scanning, and gitignore management | [`crates/hj-git/README.md`](./crates/hj-git/README.md) |
-| `hj-render` | Markdown rendering for structured handoff state | [`crates/hj-render/README.md`](./crates/hj-render/README.md) |
-| `hj-sqlite` | SQLite persistence for handoff rows and handup checkpoints | [`crates/hj-sqlite/README.md`](./crates/hj-sqlite/README.md) |
+| Crate       | Purpose                                                                        | README                                                       |
+| ----------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `hj-cli`    | Top-level CLI and installed binaries                                           | [`crates/hj-cli/README.md`](./crates/hj-cli/README.md)       |
+| `hj-core`   | Shared handoff and handup data types plus priority/title helpers               | [`crates/hj-core/README.md`](./crates/hj-core/README.md)     |
+| `hj-doob`   | `doob` reconciliation helpers and priority mapping                             | [`crates/hj-doob/README.md`](./crates/hj-doob/README.md)     |
+| `hj-git`    | Repo discovery, `.ctx` scaffolding, handoff scanning, and gitignore management | [`crates/hj-git/README.md`](./crates/hj-git/README.md)       |
+| `hj-render` | Markdown rendering for structured handoff state                                | [`crates/hj-render/README.md`](./crates/hj-render/README.md) |
+| `hj-sqlite` | SQLite persistence for handoff rows and handup checkpoints                     | [`crates/hj-sqlite/README.md`](./crates/hj-sqlite/README.md) |
 
 ## Workspace Features
 
-| Area | What it covers |
-|---|---|
-| Structured handoff state | YAML-backed `HANDOFF.*.yaml` plus gitignored per-project session state files under `.ctx/` |
-| Repo discovery | Detect repo roots, infer project names, and migrate legacy root handoffs |
-| Handoff rendering | Render active items and recent log entries to `HANDOFF.md` |
-| Handup survey | Scan nested repos and TODO markers, emit `HANDUP.json`, and checkpoint the run |
-| SQLite sync | Persist handoff rows in `~/.local/share/atelier/handoff.db` and handup checkpoints in `~/.ctx/handoffs/handup.db` |
-| Doob reconciliation | Audit or sync handoff items against `doob` todos |
-| Installed binary management | Install the current checkout or update to the latest published `hj-cli` release |
+| Area                        | What it covers                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Structured handoff state    | YAML-backed `HANDOFF.*.yaml` plus gitignored per-project session state files under `.ctx/`                        |
+| Repo discovery              | Detect repo roots, infer project names, and migrate legacy root handoffs                                          |
+| Handoff rendering           | Render active items and recent log entries to `HANDOFF.md`                                                        |
+| Handup survey               | Scan nested repos and TODO markers, emit `HANDUP.json`, and checkpoint the run                                    |
+| SQLite sync                 | Persist handoff rows in `~/.local/share/atelier/handoff.db` and handup checkpoints in `~/.ctx/handoffs/handup.db` |
+| Doob reconciliation         | Audit or sync handoff items against `doob` todos                                                                  |
+| Installed binary management | Install the current checkout or update to the latest published `hj-cli` release                                   |
 
 ## Workspace Commands
 
 ### Installed Binaries
 
-| Binary | Role |
-|---|---|
-| `hj` | Main CLI |
-| `handoff` | Shortcut for `hj handoff` |
-| `handon` | Shortcut for `hj handon` |
-| `handover` | Shortcut for `hj handover` |
-| `handoff-detect` | Shortcut for `hj detect` |
-| `handoff-db` | Shortcut for `hj handoff-db` |
-| `handup` | Shortcut for `hj handup` |
+| Binary           | Role                         |
+| ---------------- | ---------------------------- |
+| `hj`             | Main CLI                     |
+| `handoff`        | Shortcut for `hj handoff`    |
+| `handon`         | Shortcut for `hj handon`     |
+| `handover`       | Shortcut for `hj handover`   |
+| `handoff-detect` | Shortcut for `hj detect`     |
+| `handoff-db`     | Shortcut for `hj handoff-db` |
+| `handup`         | Shortcut for `hj handup`     |
 
 ### `hj` Subcommands
 
-| Command | Purpose |
-|---|---|
-| `hj detect` | Resolve the active handoff path or repo metadata |
-| `hj handoff` | Write handoff YAML, state, `HANDOFF.md`, `HANDOVER.md`, SQLite sync, and reconcile output |
-| `hj handon` | Read the current repo handoff and print grouped P0/P1/P2 triage |
-| `hj handover` | Regenerate `.ctx/HANDOVER.md` from the current handoff and state |
-| `hj handoff-db` | Inspect or update the handoff SQLite store |
-| `hj handup` | Survey repos and TODO markers into a handup report |
-| `hj install` | Install binaries from the current checkout into `~/.local/bin` |
-| `hj update` | Update installed binaries to the latest published `hj-cli` release |
-| `hj update-all` | Synonym for `hj update` |
-| `hj refresh` | Initialize or refresh `.ctx` scaffolding and ignore rules |
-| `hj reconcile` | Sync open handoff items into `doob` |
-| `hj audit` | Audit handoff coverage against `doob` without mutating state |
-| `hj close` | Write handoff YAML, state, markdown render, SQLite sync, and reconcile output |
+| Command         | Purpose                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `hj detect`     | Resolve the active handoff path or repo metadata                                          |
+| `hj handoff`    | Write handoff YAML, state, `HANDOFF.md`, `HANDOVER.md`, SQLite sync, and reconcile output |
+| `hj handon`     | Read the current repo handoff and print grouped P0/P1/P2 triage                           |
+| `hj handover`   | Regenerate `.ctx/HANDOVER.md` from the current handoff and state                          |
+| `hj handoff-db` | Inspect or update the handoff SQLite store                                                |
+| `hj handup`     | Survey repos and TODO markers into a handup report                                        |
+| `hj install`    | Install binaries from the current checkout into `~/.local/bin`                            |
+| `hj update`     | Update installed binaries to the latest published `hj-cli` release                        |
+| `hj update-all` | Synonym for `hj update`                                                                   |
+| `hj refresh`    | Initialize or refresh `.ctx` scaffolding and ignore rules                                 |
+| `hj reconcile`  | Sync open handoff items into `doob`                                                       |
+| `hj audit`      | Audit handoff coverage against `doob` without mutating state                              |
+| `hj close`      | Write handoff YAML, state, markdown render, SQLite sync, and reconcile output             |
 
 ## Install
 
