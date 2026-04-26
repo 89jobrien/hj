@@ -59,6 +59,17 @@
 
 ## Install
 
+Install the latest release via [`cargo binstall`](https://github.com/cargo-bins/cargo-binstall)
+(downloads pre-built binaries from GitHub Releases):
+
+```bash
+cargo binstall hj-cli
+```
+
+Supported targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`,
+`x86_64-apple-darwin`, `aarch64-apple-darwin`. Unsupported targets fall back to
+source compilation.
+
 Install from the current checkout:
 
 ```bash
