@@ -1,6 +1,6 @@
 // §4 — hj-git → hj-core adapter contracts
 
-use hj_git::RepoContext;
+use hjlib::RepoContext;
 use std::fs;
 use tempfile::tempdir;
 
@@ -30,7 +30,7 @@ fn s4_1_state_json_path_excluded_by_naming_convention() {
 
 #[test]
 fn s4_2_extracts_bullets_from_known_gaps() {
-    use hj_git::discover_handoffs;
+    use hjlib::git::discover_handoffs;
 
     let tmp = git_repo_with_file(
         ".ctx/HANDOFF.test.test.md",
@@ -54,7 +54,7 @@ fn s4_2_extracts_bullets_from_known_gaps() {
 
 #[test]
 fn s4_2_extracts_bullets_from_next_up() {
-    use hj_git::discover_handoffs;
+    use hjlib::git::discover_handoffs;
 
     let tmp = git_repo_with_file(
         ".ctx/HANDOFF.test.test.md",
@@ -72,7 +72,7 @@ fn s4_2_extracts_bullets_from_next_up() {
 
 #[test]
 fn s4_2_infers_priority_via_hj_core() {
-    use hj_git::discover_handoffs;
+    use hjlib::git::discover_handoffs;
 
     let tmp = git_repo_with_file(
         ".ctx/HANDOFF.test.test.md",
@@ -92,7 +92,7 @@ fn s4_2_infers_priority_via_hj_core() {
 
 #[test]
 fn s4_2_ids_assigned_sequentially() {
-    use hj_git::discover_handoffs;
+    use hjlib::git::discover_handoffs;
 
     let tmp = git_repo_with_file(
         ".ctx/HANDOFF.test.test.md",
@@ -202,7 +202,7 @@ fn s4_4_cargo_toml_drives_project_name() {
 
 #[test]
 fn s4_5_gitignore_block_is_idempotent() {
-    use hj_git::RepoContext;
+    use hjlib::RepoContext;
 
     let tmp = git_repo_with_file(
         "Cargo.toml",

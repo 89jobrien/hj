@@ -1,6 +1,6 @@
 // §1 — hj-core pure domain contracts
 
-use hj_core::{
+use hjlib::{
     Handoff, HandoffItem, HandoffState, ReconcileMode, TodoSnapshot, build_reconcile_plan,
     default_id_prefix, infer_priority, sanitize_name, titleize_slug,
 };

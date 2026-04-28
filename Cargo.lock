@@ -130,11 +130,7 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 name = "conformance"
 version = "0.1.2"
 dependencies = [
- "hj-core",
- "hj-doob",
- "hj-git",
- "hj-render",
- "hj-sqlite",
+ "hjlib",
  "rusqlite",
  "serde_yaml",
  "tempfile",
@@ -262,27 +258,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hj-cli"
+name = "hjlib"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "clap",
  "dirs",
- "hj-core",
- "hj-doob",
- "hj-git",
- "hj-render",
- "hj-sqlite",
- "serde_json",
- "serde_yaml",
- "tempfile",
-]
-
-[[package]]
-name = "hj-core"
-version = "0.1.2"
-dependencies = [
- "anyhow",
+ "rusqlite",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -292,42 +273,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "hj-doob"
+name = "hjx"
 version = "0.1.2"
 dependencies = [
  "anyhow",
- "hj-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "hj-git"
-version = "0.1.2"
-dependencies = [
- "anyhow",
- "hj-core",
+ "clap",
+ "dirs",
+ "hjlib",
  "serde_json",
  "serde_yaml",
- "walkdir",
-]
-
-[[package]]
-name = "hj-render"
-version = "0.1.2"
-dependencies = [
- "hj-core",
-]
-
-[[package]]
-name = "hj-sqlite"
-version = "0.1.2"
-dependencies = [
- "anyhow",
- "dirs",
- "hj-core",
- "rusqlite",
- "serde_json",
  "tempfile",
 ]
 

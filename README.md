@@ -4,14 +4,10 @@
 
 ## Workspace Crates
 
-| Crate       | Purpose                                                                        | README                                                       |
-| ----------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| `hj-cli`    | Top-level CLI and installed binaries                                           | [`crates/hj-cli/README.md`](./crates/hj-cli/README.md)       |
-| `hj-core`   | Shared handoff and handup data types plus priority/title helpers               | [`crates/hj-core/README.md`](./crates/hj-core/README.md)     |
-| `hj-doob`   | `doob` reconciliation helpers and priority mapping                             | [`crates/hj-doob/README.md`](./crates/hj-doob/README.md)     |
-| `hj-git`    | Repo discovery, `.ctx` scaffolding, handoff scanning, and gitignore management | [`crates/hj-git/README.md`](./crates/hj-git/README.md)       |
-| `hj-render` | Markdown rendering for structured handoff state                                | [`crates/hj-render/README.md`](./crates/hj-render/README.md) |
-| `hj-sqlite` | SQLite persistence for handoff rows and handup checkpoints                     | [`crates/hj-sqlite/README.md`](./crates/hj-sqlite/README.md) |
+| Crate   | Purpose                                                                |
+| ------- | ---------------------------------------------------------------------- |
+| `hjlib` | Library: core models, detect, git, render, doob, sqlite modules        |
+| `hjx`   | Binary: Clap-based CLI, command dispatch, install/update logic         |
 
 ## Workspace Features
 
@@ -23,7 +19,7 @@
 | Handup survey               | Scan nested repos and TODO markers, emit `HANDUP.json`, and checkpoint the run                                    |
 | SQLite sync                 | Persist handoff rows in `~/.local/share/atelier/handoff.db` and handup checkpoints in `~/.ctx/handoffs/handup.db` |
 | Doob reconciliation         | Audit or sync handoff items against `doob` todos                                                                  |
-| Installed binary management | Install the current checkout or update to the latest published `hj-cli` release                                   |
+| Installed binary management | Install the current checkout or update to the latest published `hjx` release                                      |
 
 ## Workspace Commands
 
@@ -50,7 +46,7 @@
 | `hj handoff-db` | Inspect or update the handoff SQLite store                                                |
 | `hj handup`     | Survey repos and TODO markers into a handup report                                        |
 | `hj install`    | Install binaries from the current checkout into `~/.local/bin`                            |
-| `hj update`     | Update installed binaries to the latest published `hj-cli` release                        |
+| `hj update`     | Update installed binaries to the latest published `hjx` release                        |
 | `hj update-all` | Synonym for `hj update`                                                                   |
 | `hj refresh`    | Initialize or refresh `.ctx` scaffolding and ignore rules                                 |
 | `hj reconcile`  | Sync open handoff items into `doob`                                                       |
@@ -63,7 +59,7 @@ Install the latest release via [`cargo binstall`](https://github.com/cargo-bins/
 (downloads pre-built binaries from GitHub Releases):
 
 ```bash
-cargo binstall hj-cli
+cargo binstall hjx
 ```
 
 Supported targets: `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`,
@@ -79,14 +75,14 @@ hj install
 Manual equivalent from the repo root:
 
 ```bash
-env RUSTC_WRAPPER= cargo install --path crates/hj-cli --bins --force --root ~/.local
+env RUSTC_WRAPPER= cargo install --path crates/hjx --bins --force --root ~/.local
 ```
 
 `hj install` is intended to be run from an `hj` checkout. It installs `hj`, `handoff`, `handon`, `handover`, `handup`, `handoff-db`, and `handoff-detect` into `~/.local/bin` by default.
 
 ## Update
 
-Update the installed binaries to the latest published `hj-cli` release:
+Update the installed binaries to the latest published `hjx` release:
 
 ```bash
 hj update

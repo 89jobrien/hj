@@ -1,7 +1,7 @@
 // §5 — hj-render → hj-core adapter contracts
 
-use hj_core::{Handoff, HandoffItem, HandoffState, LogEntry};
-use hj_render::{render_handover_markdown, render_markdown};
+use hjlib::render::{render_handover_markdown, render_markdown};
+use hjlib::{Handoff, HandoffItem, HandoffState, LogEntry};
 
 // §5.1 — render_markdown structure
 

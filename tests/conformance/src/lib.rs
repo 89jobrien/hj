@@ -12,4 +12,4 @@ mod git;
 #[cfg(test)]
 mod render;
 #[cfg(test)]
-mod sqlite; // §6 — documents why tests live in hj-cli instead
+mod sqlite;

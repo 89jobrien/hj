@@ -4,12 +4,8 @@
 
 `hj` is a Rust workspace centered on handoff workflows. Crates live under `crates/`:
 
-- `hj-cli`: CLI entrypoints, Clap args, command dispatch, install/update logic
-- `hj-core`: shared handoff and handup data models plus helper logic
-- `hj-git`: repo discovery, `.ctx` scaffolding, scans, and `.gitignore` management
-- `hj-render`: markdown rendering for `HANDOFF.md` and `HANDOVER.md`
-- `hj-sqlite`: SQLite persistence for handoff rows and handup checkpoints
-- `hj-doob`: `doob` reconciliation adapter
+- `hjlib`: library crate — core models, detect, git, render, doob, sqlite modules
+- `hjx`: binary crate — CLI entrypoints, Clap args, command dispatch, install/update logic
 
 Runnable demos live in `examples/`, with command-focused scripts in `examples/commands/` and the visual demo in `examples/visual/`.
 
@@ -26,7 +22,7 @@ Run all commands from the repo root.
 
 ## Coding Style & Naming Conventions
 
-Use Rust 2024 conventions and keep modules narrowly scoped by responsibility. Follow existing crate boundaries instead of adding cross-cutting helpers to `hj-cli`. Prefer descriptive snake_case for functions and modules, CamelCase for types, and keep CLI parsing in `crates/hj-cli/src/cli.rs`. Format with `cargo fmt`; do not hand-format around it.
+Use Rust 2024 conventions and keep modules narrowly scoped by responsibility. Follow existing module boundaries instead of adding cross-cutting helpers to `hjx`. Prefer descriptive snake_case for functions and modules, CamelCase for types, and keep CLI parsing in `crates/hjx/src/cli.rs`. Format with `cargo fmt`; do not hand-format around it.
 
 ## Testing Guidelines
 

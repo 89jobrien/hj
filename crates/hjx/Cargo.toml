@@ -1,0 +1,55 @@
+[package]
+name = "hjx"
+version.workspace = true
+edition.workspace = true
+description = "CLI for handoff state, reconciliation, and handup surveys"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/hjx"
+keywords = ["cli", "handoff", "workflow"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "hj"
+path = "src/main.rs"
+
+[[bin]]
+name = "handoff-detect"
+path = "src/bin/handoff-detect.rs"
+
+[[bin]]
+name = "handoff"
+path = "src/bin/handoff.rs"
+
+[[bin]]
+name = "handon"
+path = "src/bin/handon.rs"
+
+[[bin]]
+name = "handover"
+path = "src/bin/handover.rs"
+
+[[bin]]
+name = "handoff-db"
+path = "src/bin/handoff-db.rs"
+
+[[bin]]
+name = "handup"
+path = "src/bin/handup.rs"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+dirs.workspace = true
+hjlib = { version = "0.1.2", path = "../hjlib" }
+serde_json.workspace = true
+serde_yaml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

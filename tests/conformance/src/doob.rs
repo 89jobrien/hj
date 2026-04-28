@@ -1,7 +1,7 @@
 // §3 — hj-doob → hj-core adapter contracts
 // §3.3 (DoobClient::snapshot) is an integration test skipped without live doob.
 
-use hj_doob::{map_priority, unique_titles};
+use hjlib::doob::{map_priority, unique_titles};
 
 // §3.1 — map_priority shell parity
 
@@ -57,7 +57,7 @@ fn s3_2_result_is_sorted() {
 #[test]
 #[ignore = "requires doob on PATH"]
 fn s3_3_snapshot_returns_todo_snapshot_type() {
-    use hj_doob::DoobClient;
+    use hjlib::doob::DoobClient;
     let client = DoobClient::new(std::env::current_dir().unwrap());
     // Just verify it returns the correct hj-core type without panicking.
     let snapshot = client.snapshot("hj");

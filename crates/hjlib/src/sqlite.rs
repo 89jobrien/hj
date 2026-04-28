@@ -1,0 +1,568 @@
+use std::{fs, path::PathBuf};
+
+use anyhow::{Context, Result, anyhow};
+use rusqlite::{Connection, params, params_from_iter};
+
+use crate::{Handoff, LogEntry};
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct HandoffRow {
+    pub id: String,
+    pub priority: String,
+    pub status: String,
+    pub completed: String,
+    pub updated: String,
+    pub issue: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UpsertReport {
+    pub db_path: PathBuf,
+    pub synced: usize,
+}
+
+pub struct HandoffDb {
+    db_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct HandupCheckpoint {
+    pub project: String,
+    pub cwd: String,
+    pub generated: String,
+    pub recommendation: String,
+    pub json_path: String,
+}
+
+pub struct HandupDb {
+    db_path: PathBuf,
+}
+
+impl HandoffDb {
+    pub fn new() -> Result<Self> {
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
+        Ok(Self {
+            db_path: home.join(".ctx/handoff.db"),
+        })
+    }
+
+    pub fn with_path(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    pub fn init(&self) -> Result<PathBuf> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+        Ok(self.db_path.clone())
+    }
+
+    pub fn upsert(&self, project: &str, handoff: &Handoff, today: &str) -> Result<UpsertReport> {
+        let mut connection = self.open()?;
+        Self::init_schema(&connection)?;
+        let transaction = connection.transaction()?;
+
+        let mut synced = 0usize;
+        for item in &handoff.items {
+            transaction.execute(
+                "INSERT INTO items (project, id, name, priority, status, completed, updated, issue)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 ON CONFLICT(project, id) DO UPDATE SET
+                    status = excluded.status,
+                    completed = excluded.completed,
+                    updated = excluded.updated,
+                    issue = excluded.issue",
+                params![
+                    project,
+                    item.id,
+                    item.name.as_deref().unwrap_or_default(),
+                    item.priority.as_deref().unwrap_or_default(),
+                    item.status.as_deref().unwrap_or_default(),
+                    item.completed.as_deref().unwrap_or_default(),
+                    today,
+                    item.issue,
+                ],
+            )?;
+            synced += 1;
+        }
+        Self::prune_missing_items(&transaction, project, handoff)?;
+        transaction.commit()?;
+
+        Ok(UpsertReport {
+            db_path: self.db_path.clone(),
+            synced,
+        })
+    }
+
+    pub fn query(&self, project: &str) -> Result<Vec<HandoffRow>> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+
+        let mut statement = connection.prepare(
+            "SELECT id, coalesce(priority, ''), coalesce(status, ''), coalesce(completed, ''),
+                    coalesce(updated, ''), issue
+             FROM items
+             WHERE project = ?1
+             ORDER BY priority, id",
+        )?;
+        let rows = statement.query_map(params![project], |row| {
+            let issue_val: Option<i64> = row.get(5)?;
+            Ok(HandoffRow {
+                id: row.get(0)?,
+                priority: row.get(1)?,
+                status: row.get(2)?,
+                completed: row.get(3)?,
+                updated: row.get(4)?,
+                issue: issue_val.map(|v| v as u64),
+            })
+        })?;
+
+        let mut items = Vec::new();
+        for row in rows {
+            items.push(row?);
+        }
+        Ok(items)
+    }
+
+    pub fn complete(&self, project: &str, id: &str, today: &str) -> Result<bool> {
+        self.update_status(project, id, "done", Some(today), today)
+    }
+
+    pub fn set_status(&self, project: &str, id: &str, status: &str, today: &str) -> Result<bool> {
+        self.update_status(project, id, status, None, today)
+    }
+
+    fn open(&self) -> Result<Connection> {
+        let parent = self
+            .db_path
+            .parent()
+            .ok_or_else(|| anyhow!("database path has no parent directory"))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+
+        Connection::open(&self.db_path)
+            .with_context(|| format!("failed to open {}", self.db_path.display()))
+    }
+
+    pub fn log_append(
+        &self,
+        project: &str,
+        date: &str,
+        summary: &str,
+        commits: &[String],
+    ) -> Result<()> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+        let commits_json =
+            serde_json::to_string(commits).context("failed to serialize commits to JSON")?;
+        connection.execute(
+            "INSERT INTO log (project, date, summary, commits) VALUES (?1, ?2, ?3, ?4)",
+            params![project, date, summary, commits_json],
+        )?;
+        Ok(())
+    }
+
+    pub fn log_query(&self, project: &str) -> Result<Vec<LogEntry>> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+
+        let mut statement = connection.prepare(
+            "SELECT date, summary, commits FROM log WHERE project = ?1 ORDER BY id DESC",
+        )?;
+        let rows = statement.query_map(params![project], |row| {
+            let date: String = row.get(0)?;
+            let summary: String = row.get(1)?;
+            let commits_json: String = row.get(2)?;
+            Ok((date, summary, commits_json))
+        })?;
+
+        let mut entries = Vec::new();
+        for row in rows {
+            let (date, summary, commits_json) = row?;
+            let commits: Vec<String> = serde_json::from_str(&commits_json).unwrap_or_default();
+            entries.push(LogEntry {
+                date: Some(date),
+                summary,
+                commits,
+                extra: Default::default(),
+            });
+        }
+        Ok(entries)
+    }
+
+    fn init_schema(connection: &Connection) -> Result<()> {
+        connection.execute_batch(
+            "CREATE TABLE IF NOT EXISTS items (
+                project   TEXT NOT NULL,
+                id        TEXT NOT NULL,
+                name      TEXT,
+                priority  TEXT,
+                status    TEXT,
+                completed TEXT,
+                updated   TEXT,
+                issue     INTEGER,
+                PRIMARY KEY (project, id)
+            );
+            CREATE TABLE IF NOT EXISTS log (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                project    TEXT NOT NULL,
+                date       TEXT NOT NULL,
+                summary    TEXT NOT NULL,
+                commits    TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT DEFAULT (datetime('now'))
+            );",
+        )?;
+        let has_issue: bool = connection
+            .prepare("SELECT 1 FROM pragma_table_info('items') WHERE name = 'issue'")?
+            .exists([])?;
+        if !has_issue {
+            connection.execute_batch("ALTER TABLE items ADD COLUMN issue INTEGER;")?;
+        }
+        Ok(())
+    }
+
+    fn prune_missing_items(
+        connection: &Connection,
+        project: &str,
+        handoff: &Handoff,
+    ) -> Result<()> {
+        if handoff.items.is_empty() {
+            connection.execute("DELETE FROM items WHERE project = ?1", params![project])?;
+            return Ok(());
+        }
+
+        let placeholders = std::iter::repeat_n("?", handoff.items.len())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let sql = format!("DELETE FROM items WHERE project = ? AND id NOT IN ({placeholders})");
+        let params = std::iter::once(project.to_string())
+            .chain(handoff.items.iter().map(|item| item.id.clone()))
+            .collect::<Vec<_>>();
+        connection.execute(&sql, params_from_iter(params))?;
+        Ok(())
+    }
+
+    fn update_status(
+        &self,
+        project: &str,
+        id: &str,
+        status: &str,
+        completed: Option<&str>,
+        today: &str,
+    ) -> Result<bool> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+        let changed = connection.execute(
+            "UPDATE items
+             SET status = ?3,
+                 completed = COALESCE(?4, completed),
+                 updated = ?5
+             WHERE project = ?1 AND id = ?2",
+            params![project, id, status, completed, today],
+        )?;
+        Ok(changed > 0)
+    }
+}
+
+impl HandupDb {
+    pub fn new() -> Result<Self> {
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
+        Ok(Self {
+            db_path: home.join(".ctx/handoffs/handup.db"),
+        })
+    }
+
+    pub fn with_path(db_path: PathBuf) -> Self {
+        Self { db_path }
+    }
+
+    pub fn checkpoint(&self, checkpoint: &HandupCheckpoint) -> Result<PathBuf> {
+        let connection = self.open()?;
+        Self::init_schema(&connection)?;
+        connection.execute(
+            "INSERT INTO checkpoints (project, cwd, generated, recommendation, json_path)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                checkpoint.project,
+                checkpoint.cwd,
+                checkpoint.generated,
+                checkpoint.recommendation,
+                checkpoint.json_path
+            ],
+        )?;
+        Ok(self.db_path.clone())
+    }
+
+    fn open(&self) -> Result<Connection> {
+        let parent = self
+            .db_path
+            .parent()
+            .ok_or_else(|| anyhow!("database path has no parent directory"))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+
+        Connection::open(&self.db_path)
+            .with_context(|| format!("failed to open {}", self.db_path.display()))
+    }
+
+    fn init_schema(connection: &Connection) -> Result<()> {
+        connection.execute_batch(
+            "CREATE TABLE IF NOT EXISTS checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project TEXT NOT NULL,
+                cwd TEXT NOT NULL,
+                generated TEXT NOT NULL,
+                recommendation TEXT,
+                json_path TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );",
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Handoff, HandoffItem};
+    use rusqlite::Connection;
+    use tempfile::tempdir;
+
+    use super::{HandoffDb, HandoffRow, HandupCheckpoint, HandupDb};
+
+    #[test]
+    fn query_returns_rows_in_priority_order() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let handoff = Handoff {
+            items: vec![
+                HandoffItem {
+                    id: "hj-2".into(),
+                    priority: Some("P2".into()),
+                    status: Some("open".into()),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-1".into(),
+                    priority: Some("P1".into()),
+                    status: Some("blocked".into()),
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &handoff, "2026-04-16").expect("upsert");
+
+        let rows = db.query("hj").expect("query");
+        assert_eq!(
+            rows,
+            vec![
+                HandoffRow {
+                    id: "hj-1".into(),
+                    priority: "P1".into(),
+                    status: "blocked".into(),
+                    completed: String::new(),
+                    updated: "2026-04-16".into(),
+                    issue: None,
+                },
+                HandoffRow {
+                    id: "hj-2".into(),
+                    priority: "P2".into(),
+                    status: "open".into(),
+                    completed: String::new(),
+                    updated: "2026-04-16".into(),
+                    issue: None,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn complete_and_status_update_existing_rows() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let handoff = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                priority: Some("P1".into()),
+                status: Some("open".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &handoff, "2026-04-16").expect("upsert");
+        assert!(
+            db.set_status("hj", "hj-1", "blocked", "2026-04-17")
+                .expect("status")
+        );
+        assert!(db.complete("hj", "hj-1", "2026-04-18").expect("complete"));
+
+        let rows = db.query("hj").expect("query");
+        assert_eq!(rows[0].status, "done");
+        assert_eq!(rows[0].completed, "2026-04-18");
+        assert_eq!(rows[0].updated, "2026-04-18");
+    }
+
+    #[test]
+    fn upsert_prunes_rows_removed_from_handoff() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let initial = Handoff {
+            items: vec![
+                HandoffItem {
+                    id: "hj-1".into(),
+                    priority: Some("P1".into()),
+                    status: Some("open".into()),
+                    ..HandoffItem::default()
+                },
+                HandoffItem {
+                    id: "hj-2".into(),
+                    priority: Some("P2".into()),
+                    status: Some("open".into()),
+                    ..HandoffItem::default()
+                },
+            ],
+            ..Handoff::default()
+        };
+        let updated = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-2".into(),
+                priority: Some("P2".into()),
+                status: Some("blocked".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &initial, "2026-04-16")
+            .expect("initial upsert");
+        db.upsert("hj", &updated, "2026-04-17")
+            .expect("updated upsert");
+
+        let rows = db.query("hj").expect("query");
+        assert_eq!(
+            rows,
+            vec![HandoffRow {
+                id: "hj-2".into(),
+                priority: "P2".into(),
+                status: "blocked".into(),
+                completed: String::new(),
+                updated: "2026-04-17".into(),
+                issue: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn upsert_empty_handoff_prunes_only_target_project() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let initial = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                priority: Some("P1".into()),
+                status: Some("open".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+        let other_project = Handoff {
+            items: vec![HandoffItem {
+                id: "other-1".into(),
+                priority: Some("P2".into()),
+                status: Some("open".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &initial, "2026-04-16").expect("hj upsert");
+        db.upsert("other", &other_project, "2026-04-16")
+            .expect("other upsert");
+        db.upsert("hj", &Handoff::default(), "2026-04-17")
+            .expect("empty upsert");
+
+        assert!(db.query("hj").expect("hj query").is_empty());
+        assert_eq!(
+            db.query("other").expect("other query"),
+            vec![HandoffRow {
+                id: "other-1".into(),
+                priority: "P2".into(),
+                status: "open".into(),
+                completed: String::new(),
+                updated: "2026-04-16".into(),
+                issue: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn log_append_and_query_round_trip() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+
+        db.log_append("hj", "2026-04-21", "previous session", &[])
+            .expect("log_append first");
+        db.log_append(
+            "hj",
+            "2026-04-22",
+            "wired log persistence",
+            &["abc1234".to_string()],
+        )
+        .expect("log_append second");
+
+        let entries = db.log_query("hj").expect("log_query");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].date.as_deref(), Some("2026-04-22"));
+        assert_eq!(entries[0].summary, "wired log persistence");
+        assert_eq!(entries[0].commits, vec!["abc1234".to_string()]);
+        assert_eq!(entries[1].date.as_deref(), Some("2026-04-21"));
+        assert_eq!(entries[1].commits, Vec::<String>::new());
+    }
+
+    #[test]
+    fn log_query_returns_empty_for_unknown_project() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+
+        let entries = db.log_query("no-such-project").expect("log_query");
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn log_query_scoped_to_project() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+
+        db.log_append("hj", "2026-04-22", "hj session", &[])
+            .expect("hj log");
+        db.log_append("other", "2026-04-22", "other session", &[])
+            .expect("other log");
+
+        let hj_entries = db.log_query("hj").expect("hj query");
+        assert_eq!(hj_entries.len(), 1);
+        assert_eq!(hj_entries[0].summary, "hj session");
+    }
+
+    #[test]
+    fn handup_checkpoint_persists_rows() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandupDb::with_path(tmp.path().join("handup.db"));
+        let checkpoint = HandupCheckpoint {
+            project: "hj".into(),
+            cwd: "/Users/joe/dev/hj".into(),
+            generated: "2026-04-16".into(),
+            recommendation: "Clean state".into(),
+            json_path: "/Users/joe/.ctx/handoffs/hj/HANDUP.json".into(),
+        };
+
+        let db_path = db.checkpoint(&checkpoint).expect("checkpoint");
+        assert!(db_path.ends_with("handup.db"));
+
+        let connection = Connection::open(db_path).expect("open db");
+        let count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM checkpoints", [], |row| row.get(0))
+            .expect("count");
+        assert_eq!(count, 1);
+    }
+}

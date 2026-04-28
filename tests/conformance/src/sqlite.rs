@@ -1,7 +1,7 @@
 // §2 — hj-sqlite → hj-core adapter contracts
 
-use hj_core::{Handoff, HandoffItem};
-use hj_sqlite::{HandoffDb, HandupCheckpoint, HandupDb};
+use hjlib::sqlite::{HandoffDb, HandupCheckpoint, HandupDb};
+use hjlib::{Handoff, HandoffItem};
 use rusqlite::Connection;
 use tempfile::tempdir;
 
