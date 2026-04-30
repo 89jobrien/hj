@@ -53,7 +53,7 @@ Generate the standalone visual walkthrough:
 
 ## Notes
 
-- `update` and `update-all` install from the published `hj-cli` package, so they require registry/network access.
+- `update` and `update-all` install from the published `hjx` package, so they require registry/network access.
 - `reconcile` and `audit` require `doob` on `PATH`.
 - The demo repos are temporary and can be deleted after each run.
 - `visual-demo.sh` writes a browserable artifact to `examples/visual/index.html`.
