@@ -1,57 +1,58 @@
 # hj
 
-`hj` is a Rust workspace for handoff state, reconciliation, rendering, and handup surveys.
+`hj` tracks work-in-progress across sessions using structured YAML handoff files. Each repo
+gets a `.ctx/HANDOFF.<project>.<repo>.yaml` that holds open items, priorities, and a session
+log. The CLI reads that file to triage at session start, appends log entries at session end,
+syncs state to SQLite, and renders markdown summaries for humans and agents.
 
-## Workspace Crates
+## Quick Start
 
-| Crate   | Purpose                                                                |
-| ------- | ---------------------------------------------------------------------- |
-| `hjlib` | Library: core models, detect, git, render, doob, sqlite modules        |
-| `hjx`   | Binary: Clap-based CLI, command dispatch, install/update logic         |
+```bash
+# Install via pre-built binary
+cargo binstall hjx
 
-## Workspace Features
+# In any git repo: scaffold .ctx/ and .gitignore entries
+hj refresh
 
-| Area                        | What it covers                                                                                                    |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Structured handoff state    | YAML-backed `HANDOFF.*.yaml` plus gitignored per-project session state files under `.ctx/`                        |
-| Repo discovery              | Detect repo roots, infer project names, and migrate legacy root handoffs                                          |
-| Handoff rendering           | Render active items and recent log entries to `HANDOFF.md`                                                        |
-| Handup survey               | Scan nested repos and TODO markers, emit `HANDUP.json`, and checkpoint the run                                    |
-| SQLite sync                 | Persist handoff rows in `~/.local/share/atelier/handoff.db` and handup checkpoints in `~/.ctx/handoffs/handup.db` |
-| Doob reconciliation         | Audit or sync handoff items against `doob` todos                                                                  |
-| Installed binary management | Install the current checkout or update to the latest published `hjx` release                                      |
+# Start a session — prints P0/P1/P2 triage from the handoff file
+hj handon
 
-## Workspace Commands
+# End a session — appends a log entry, writes HANDOFF.md, syncs SQLite
+hj handoff --log-summary "What you did"
+```
 
-### Installed Binaries
+## Handoff File Format
 
-| Binary           | Role                         |
-| ---------------- | ---------------------------- |
-| `hj`             | Main CLI                     |
-| `handoff`        | Shortcut for `hj handoff`    |
-| `handon`         | Shortcut for `hj handon`     |
-| `handover`       | Shortcut for `hj handover`   |
-| `handoff-detect` | Shortcut for `hj detect`     |
-| `handoff-db`     | Shortcut for `hj handoff-db` |
-| `handup`         | Shortcut for `hj handup`     |
+Handoff files live at `.ctx/HANDOFF.<project>.<repo>.yaml`:
 
-### `hj` Subcommands
+```yaml
+project: myproject
+id: myproject
+updated: 2026-04-30
+items:
+  - id: mp-1
+    priority: P1
+    status: open
+    title: Wire the render pass
+    description: |
+      Description of what needs doing and why.
+    files:
+      - src/render.rs
+  - id: mp-2
+    priority: P2
+    status: done
+    title: Add conformance tests
+    completed: 2026-04-28
+log:
+  - date: 20260428:131508
+    summary: Shipped render pass skeleton, all tests pass.
+    commits:
+      - sha: abc1234
+        branch: main
+```
 
-| Command         | Purpose                                                                                   |
-| --------------- | ----------------------------------------------------------------------------------------- |
-| `hj detect`     | Resolve the active handoff path or repo metadata                                          |
-| `hj handoff`    | Write handoff YAML, state, `HANDOFF.md`, `HANDOVER.md`, SQLite sync, and reconcile output |
-| `hj handon`     | Read the current repo handoff and print grouped P0/P1/P2 triage                           |
-| `hj handover`   | Regenerate `.ctx/HANDOVER.md` from the current handoff and state                          |
-| `hj handoff-db` | Inspect or update the handoff SQLite store                                                |
-| `hj handup`     | Survey repos and TODO markers into a handup report                                        |
-| `hj install`    | Install binaries from the current checkout into `~/.local/bin`                            |
-| `hj update`     | Update installed binaries to the latest published `hjx` release                        |
-| `hj update-all` | Synonym for `hj update`                                                                   |
-| `hj refresh`    | Initialize or refresh `.ctx` scaffolding and ignore rules                                 |
-| `hj reconcile`  | Sync open handoff items into `doob`                                                       |
-| `hj audit`      | Audit handoff coverage against `doob` without mutating state                              |
-| `hj close`      | Write handoff YAML, state, markdown render, SQLite sync, and reconcile output             |
+Items have `status: open | blocked | done`. The `log` section grows with each session.
+Commits accept either bare SHAs (`abc1234`) or `{sha, branch}` maps.
 
 ## Install
 
@@ -72,111 +73,141 @@ Install from the current checkout:
 hj install
 ```
 
-Manual equivalent from the repo root:
+Manual equivalent:
 
 ```bash
 env RUSTC_WRAPPER= cargo install --path crates/hjx --bins --force --root ~/.local
 ```
 
-`hj install` is intended to be run from an `hj` checkout. It installs `hj`, `handoff`, `handon`, `handover`, `handup`, `handoff-db`, and `handoff-detect` into `~/.local/bin` by default.
-
-## Update
-
-Update the installed binaries to the latest published `hjx` release:
+Update to the latest published release:
 
 ```bash
 hj update
 ```
 
-`hj update-all` is a synonym for `hj update`.
+## Installed Binaries
+
+| Binary           | Equivalent            |
+| ---------------- | --------------------- |
+| `hj`             | Main CLI              |
+| `handoff`        | `hj handoff`          |
+| `handon`         | `hj handon`           |
+| `handover`       | `hj handover`         |
+| `handoff-detect` | `hj detect`           |
+| `handoff-db`     | `hj handoff-db`       |
+| `handup`         | `hj handup`           |
 
 ## Commands
 
-```text
-hj detect
-hj handoff
-hj handon
-hj handover
-hj handoff-db
-hj handup
-hj install
-hj update
-hj update-all
-hj refresh
-hj reconcile
-hj audit
-hj close
+| Command         | What it does                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| `hj detect`     | Resolve the active handoff path, repo root, or project name                                |
+| `hj handon`     | Print grouped P0/P1/P2 triage from the current handoff                                     |
+| `hj handoff`    | Append a log entry, write `HANDOFF.md` + `HANDOVER.md`, sync SQLite, reconcile with doob  |
+| `hj close`      | Alias for `hj handoff`                                                                     |
+| `hj handover`   | Regenerate `.ctx/HANDOVER.md` from the current handoff and session state                   |
+| `hj handoff-db` | Inspect or update the handoff SQLite store                                                 |
+| `hj handup`     | Scan nested repos and TODO markers, emit a handup report                                   |
+| `hj refresh`    | Scaffold `.ctx/` and add gitignore entries for state files                                 |
+| `hj reconcile`  | Create missing doob todos for open handoff items                                           |
+| `hj audit`      | Report handoff items not covered by doob, without mutating state                           |
+| `hj install`    | Install binaries from the current checkout into `~/.local/bin`                             |
+| `hj update`     | Update installed binaries to the latest published `hjx` release                           |
+
+### Key flags
+
+`hj handoff` / `hj close`:
+
+```
+--log-summary <TEXT>   Session summary appended to the log
+--commit <SHA>         Commit SHA(s) to attach (repeatable)
+--build <STATUS>       Build state to record (e.g. clean, failing)
+--tests <STATUS>       Test state to record
+--notes <TEXT>         Freeform session notes
+--project <NAME>       Override project name
+--handoff <PATH>       Explicit handoff file path
+--allow-create         Create the handoff file if it does not exist
+--force-refresh        Force a full refresh of .ctx scaffolding
+```
+
+`hj detect`:
+
+```
+--name     Print the inferred project name
+--root     Print the repo root
+--project  Print the resolved project slug
+--init     Initialize .ctx if missing
 ```
 
 ## Common Workflows
 
-Detect the active handoff path for the current repo:
-
-```bash
-hj detect
-handoff-detect --project
-```
-
-Survey a tree and write `HANDUP.json` plus a checkpoint:
-
-```bash
-hj handup
-handup --max-depth 5
-```
-
-Inspect or update the SQLite handoff store:
-
-```bash
-handoff-db query --project hj
-handoff-db upsert --project hj --handoff .ctx/HANDOFF.hj.hj.yaml
-```
-
-Refresh `.ctx` scaffolding:
-
-```bash
-hj refresh
-```
-
-Close out a handoff and render markdown:
-
-```bash
-hj handoff --log-summary "Finished the current work slice"
-hj close --log-summary "Finished the current work slice"
-```
-
-Print repo-local triage:
+**Start a session:**
 
 ```bash
 hj handon
-handon --project hj
 ```
 
-Regenerate the compact handover summary:
+**End a session:**
+
+```bash
+hj handoff --log-summary "Implemented X, fixed Y" --commit abc1234
+```
+
+**Survey all repos under the current directory:**
+
+```bash
+hj handup
+handup --max-depth 3
+```
+
+**Inspect the SQLite store:**
+
+```bash
+handoff-db query --project myproject
+handoff-db upsert --project myproject --handoff .ctx/HANDOFF.myproject.myproject.yaml
+```
+
+**Sync open items into doob:**
+
+```bash
+hj reconcile
+hj audit   # dry-run: report only, no mutations
+```
+
+**Regenerate the handover summary:**
 
 ```bash
 hj handover
-handover
 ```
 
-## Examples
+## Workspace Crates
 
-Runnable command demos live under [`examples/`](./examples/README.md).
+| Crate   | Role                                                             |
+| ------- | ---------------------------------------------------------------- |
+| `hjlib` | Library: models, detect, git, render, doob, sqlite              |
+| `hjx`   | Binary: CLI entrypoints, Clap arg parsing, command dispatch      |
+
+## Development
+
+```bash
+cargo fmt --all --check
+env RUSTC_WRAPPER= cargo clippy --workspace --locked -- -D warnings
+env RUSTC_WRAPPER= cargo test --workspace --locked
+cargo check --workspace --locked
+```
+
+Run a single test by name:
+
+```bash
+env RUSTC_WRAPPER= cargo test --workspace --locked -- test_name
+```
+
+Runnable command demos live under [`examples/`](./examples/README.md). They use disposable
+temp repos and an isolated `HOME`, so they do not touch your real handoff DB or `~/.local`.
 
 ```bash
 ./examples/commands/01-detect.sh
 ./examples/commands/03-handoff.sh
 ./examples/commands/07-handup.sh
 ./examples/visual-demo.sh
-```
-
-The examples use disposable temp repos and an isolated `HOME`, so they do not touch your real handoff DB or `~/.local`.
-
-## Development
-
-Run the standard Rust checks from the workspace root:
-
-```bash
-cargo fmt --all --check
-env RUSTC_WRAPPER= cargo clippy --workspace -- -D warnings
-env RUSTC_WRAPPER= cargo test --workspace
 ```
