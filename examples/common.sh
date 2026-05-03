@@ -42,7 +42,7 @@ EOF
 
   git init -q "$DEMO_REPO"
   git -C "$DEMO_REPO" config user.name "hj examples"
-  git -C "$DEMO_REPO" config user.email "examples@local"
+  git -C "$DEMO_REPO" config user.email "joseph.obrien@toptal.com"
   git -C "$DEMO_REPO" add .
   git -C "$DEMO_REPO" commit -qm "init demo repo"
 }
