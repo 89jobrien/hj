@@ -5,9 +5,9 @@ use hjlib::doob::{DoobClient, ensure_doob_on_path, map_priority};
 use hjlib::render::{render_handover_markdown, render_markdown};
 use hjlib::sqlite::{HandoffDb, HandoffRow};
 use hjlib::{
-    ExtraEntry, Handoff, HandoffItem, HandoffPaths, HandoffState, LogEntry, ReconcileMode,
-    ReconcileReport, RepoContext, branch_name, build_reconcile_plan, current_short_head, discover,
-    today,
+    CommitRef, ExtraEntry, Handoff, HandoffItem, HandoffPaths, HandoffState, LogEntry,
+    ReconcileMode, ReconcileReport, RepoContext, branch_name, build_reconcile_plan,
+    current_short_head, discover, today,
 };
 
 use crate::cli::{CloseArgs, DbArgs, DbCommand, DetectArgs, RefreshArgs, TargetArgs};
@@ -223,14 +223,18 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
     handoff.ensure_id_prefix(&paths.project);
     handoff.updated = Some(today.clone());
 
-    let log_commits = if args.log_summary.is_some() {
-        if args.commits.is_empty() {
+    let branch = branch_name(&context.repo_root).unwrap_or_else(|_| "main".to_string());
+    let log_commits: Vec<CommitRef> = if args.log_summary.is_some() {
+        let shas = if args.commits.is_empty() {
             current_short_head(&context.repo_root)
                 .map(|hash| vec![hash])
                 .unwrap_or_default()
         } else {
             args.commits.clone()
-        }
+        };
+        shas.into_iter()
+            .map(|sha| CommitRef::Object { sha, branch: Some(branch.clone()) })
+            .collect()
     } else {
         Vec::new()
     };
@@ -251,8 +255,9 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
 
     let db = HandoffDb::new()?;
     if let Some(ref summary) = args.log_summary {
-        db.log_append(&paths.project, &today, summary, &log_commits)?;
-        append_jsonl_log(&paths.project, &today, summary, &log_commits)?;
+        let sha_list: Vec<String> = log_commits.iter().map(|c| c.sha().to_string()).collect();
+        db.log_append(&paths.project, &today, summary, &sha_list)?;
+        append_jsonl_log(&paths.project, &today, summary, &sha_list)?;
         state.last_log = Some(summary.clone());
     }
 

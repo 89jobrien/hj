@@ -1,484 +1,157 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>hj Visual Demo</title>
-    <style>
-      :root {
-        --bg: #f4efe6;
-        --bg-strong: #efe4d1;
-        --surface: rgba(255, 251, 245, 0.88);
-        --surface-strong: rgba(255, 248, 238, 0.98);
-        --ink: #1e2430;
-        --muted: #5b6577;
-        --line: rgba(42, 58, 82, 0.14);
-        --accent: #ba5a2a;
-        --accent-soft: rgba(186, 90, 42, 0.12);
-        --accent-2: #1f6b5c;
-        --shadow: 0 20px 60px rgba(44, 31, 18, 0.12);
-        --radius: 22px;
-        --mono:
-          "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
-        --serif:
-          "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-        --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
-      }
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hj Visual Demo</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-raised: #1c2330;
+      --ink: #cdd9e5;
+      --muted: #768390;
+      --line: rgba(205, 217, 229, 0.08);
+      --accent: #e8834a;
+      --accent-soft: rgba(232, 131, 74, 0.12);
+      --accent-2: #4caf8a;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --radius: 14px;
+      --mono: "SFMono-Regular", "JetBrains Mono", Menlo, monospace;
+      --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg);
+    }
+    .shell { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 32px 0 72px; }
+    .hero, .panel, .card {
+      background: var(--surface);
+      border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+    }
+    .hero { overflow: hidden; position: relative; padding: 32px; }
+    .eyebrow {
+      display: inline-flex; gap: 8px; align-items: center;
+      padding: 5px 10px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent);
+      letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; font-weight: 700;
+    }
+    h1, h2, h3 { margin: 0; font-family: var(--serif); font-weight: 700; line-height: 1.02; }
+    h1 { margin-top: 18px; font-size: clamp(2.2rem, 5vw, 4rem); max-width: 14ch; color: var(--ink); }
+    .lede { margin: 14px 0 0; max-width: 58rem; color: var(--muted); font-size: 0.97rem; line-height: 1.65; }
+    .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 20px; }
+    .meta .chip { padding: 10px 14px; border-radius: 10px; background: var(--surface-raised); border: 1px solid var(--line); font-size: 0.88rem; color: var(--muted); }
+    .meta .chip strong { color: var(--ink); display: block; margin-bottom: 2px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+    .panel { padding: 20px; }
+    .cmd-list { margin-top: 16px; display: flex; flex-direction: column; gap: 2px; }
+    .cmd-item { display: flex; flex-direction: column; gap: 3px; padding: 8px 8px; border-radius: 8px; }
+    .cmd-item:hover { background: var(--surface-raised); }
+    .cmd-item code { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .cmd-item span { font-size: 0.8rem; color: var(--muted); line-height: 1.45; }
+    .content { display: grid; gap: 14px; }
+    .card { overflow: hidden; animation: rise 380ms ease both; }
+    .card:nth-child(2) { animation-delay: 50ms; }
+    .card:nth-child(3) { animation-delay: 100ms; }
+    .card:nth-child(4) { animation-delay: 150ms; }
+    .card:nth-child(5) { animation-delay: 200ms; }
+    .card:nth-child(6) { animation-delay: 250ms; }
+    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .card-header { display: flex; justify-content: space-between; gap: 16px; align-items: start; padding: 18px 20px 0; }
+    .card-header h3 { margin-top: 10px; font-size: 1.3rem; color: var(--ink); }
+    .card-header p { margin: 8px 0 0; color: var(--muted); line-height: 1.55; font-size: 0.9rem; }
+    .badge { white-space: nowrap; padding: 5px 9px; border-radius: 999px; background: rgba(76, 175, 138, 0.12); color: var(--accent-2); font-weight: 700; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; padding: 16px 20px 20px; }
+    .terminal, .artifact { min-height: 100%; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #090d13; color: #adbac7; }
+    .artifact { background: var(--surface-raised); color: var(--ink); }
+    .window-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; font-family: var(--mono); font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--line); }
+    .artifact .window-bar { color: var(--accent); }
+    pre { margin: 0; padding: 14px; overflow-x: auto; font-family: var(--mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .footer { margin-top: 14px; padding: 16px 20px; color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
+    code { font-family: var(--mono); font-size: 0.92em; }
+    @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow">Visual walkthrough</div>
+      <h1>hj — handoff in practice.</h1>
+      <p class="lede">
+        Generated from a disposable demo repo using the local binary from this checkout.
+        Real command output, real files.
+      </p>
+      <div class="meta">
+        <div class="chip"><strong>Regenerate</strong><code>nu examples/visual-demo.nu</code></div>
+        <div class="chip"><strong>Demo repo</strong><code>/var/folders/6t/95fl89_n4hsg_gsj0p955xh00000gn/T/tmp.Yx0QtDgtaP/demo-app</code></div>
+        <div class="chip"><strong>Output</strong><code>/Users/joe/dev/hj/examples/visual/index.html</code></div>
+      </div>
+    </section>
 
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        font-family: var(--sans);
-        color: var(--ink);
-        background:
-          radial-gradient(
-            circle at top left,
-            rgba(186, 90, 42, 0.22),
-            transparent 34%
-          ),
-          radial-gradient(
-            circle at top right,
-            rgba(31, 107, 92, 0.18),
-            transparent 28%
-          ),
-          linear-gradient(180deg, #f7f1e8 0%, #f1eadf 45%, #ece4d7 100%);
-      }
-
-      .shell {
-        width: min(1180px, calc(100vw - 32px));
-        margin: 0 auto;
-        padding: 32px 0 72px;
-      }
-
-      .hero,
-      .panel,
-      .card {
-        background: var(--surface);
-        backdrop-filter: blur(10px);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-      }
-
-      .hero {
-        overflow: hidden;
-        position: relative;
-        padding: 32px;
-      }
-
-      .hero::after {
-        content: "";
-        position: absolute;
-        inset: auto -80px -90px auto;
-        width: 260px;
-        height: 260px;
-        border-radius: 50%;
-        background: radial-gradient(
-          circle,
-          rgba(186, 90, 42, 0.24),
-          transparent 70%
-        );
-        pointer-events: none;
-      }
-
-      .eyebrow {
-        display: inline-flex;
-        gap: 8px;
-        align-items: center;
-        padding: 7px 12px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      h1,
-      h2,
-      h3 {
-        margin: 0;
-        font-family: var(--serif);
-        font-weight: 700;
-        line-height: 1.02;
-      }
-
-      h1 {
-        margin-top: 18px;
-        font-size: clamp(2.7rem, 6vw, 5.5rem);
-        max-width: 10ch;
-      }
-
-      .lede {
-        margin: 18px 0 0;
-        max-width: 58rem;
-        color: var(--muted);
-        font-size: 1.05rem;
-        line-height: 1.65;
-      }
-
-      .meta {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 14px;
-        margin-top: 24px;
-      }
-
-      .meta .chip {
-        padding: 14px 16px;
-        border-radius: 18px;
-        background: var(--surface-strong);
-        border: 1px solid var(--line);
-        font-size: 0.95rem;
-      }
-
-      .layout {
-        display: grid;
-        grid-template-columns: 320px minmax(0, 1fr);
-        gap: 20px;
-        margin-top: 22px;
-      }
-
-      .panel {
-        padding: 24px;
-      }
-
-      .flow {
-        display: grid;
-        gap: 12px;
-        margin-top: 18px;
-      }
-
-      .flow-step {
-        position: relative;
-        padding: 14px 14px 14px 48px;
-        border-radius: 16px;
-        background: var(--surface-strong);
-        border: 1px solid var(--line);
-      }
-
-      .flow-step::before {
-        content: attr(data-step);
-        position: absolute;
-        left: 14px;
-        top: 14px;
-        width: 24px;
-        height: 24px;
-        display: grid;
-        place-items: center;
-        border-radius: 50%;
-        background: var(--accent);
-        color: white;
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      .flow-step strong {
-        display: block;
-        font-size: 0.95rem;
-      }
-
-      .flow-step span {
-        display: block;
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 0.92rem;
-        line-height: 1.45;
-      }
-
-      .content {
-        display: grid;
-        gap: 18px;
-      }
-
-      .card {
-        overflow: hidden;
-        animation: rise 420ms ease both;
-      }
-
-      .card:nth-child(2) {
-        animation-delay: 60ms;
-      }
-      .card:nth-child(3) {
-        animation-delay: 120ms;
-      }
-      .card:nth-child(4) {
-        animation-delay: 180ms;
-      }
-      .card:nth-child(5) {
-        animation-delay: 240ms;
-      }
-      .card:nth-child(6) {
-        animation-delay: 300ms;
-      }
-
-      @keyframes rise {
-        from {
-          opacity: 0;
-          transform: translateY(18px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
-        align-items: end;
-        padding: 20px 22px 0;
-      }
-
-      .card-header p {
-        margin: 10px 0 0;
-        color: var(--muted);
-        line-height: 1.55;
-      }
-
-      .badge {
-        white-space: nowrap;
-        align-self: start;
-        padding: 8px 10px;
-        border-radius: 999px;
-        background: rgba(31, 107, 92, 0.12);
-        color: var(--accent-2);
-        font-weight: 700;
-        font-size: 12px;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 16px;
-        padding: 20px 22px 24px;
-      }
-
-      .terminal,
-      .artifact {
-        min-height: 100%;
-        border-radius: 18px;
-        overflow: hidden;
-        border: 1px solid rgba(23, 28, 38, 0.12);
-        background: #10151d;
-        color: #d6dfef;
-      }
-
-      .artifact {
-        background: #fbf8f2;
-        color: var(--ink);
-      }
-
-      .window-bar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 10px 14px;
-        font-family: var(--mono);
-        font-size: 12px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.05);
-      }
-
-      .artifact .window-bar {
-        border-bottom: 1px solid rgba(23, 28, 38, 0.08);
-        background: rgba(186, 90, 42, 0.07);
-      }
-
-      pre {
-        margin: 0;
-        padding: 16px;
-        overflow-x: auto;
-        font-family: var(--mono);
-        font-size: 12.5px;
-        line-height: 1.55;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-
-      .footer {
-        margin-top: 22px;
-        padding: 18px 22px;
-        color: var(--muted);
-        font-size: 0.94rem;
-        line-height: 1.6;
-      }
-
-      code {
-        font-family: var(--mono);
-        font-size: 0.94em;
-      }
-
-      @media (max-width: 920px) {
-        .layout {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="shell">
-      <section class="hero">
-        <div class="eyebrow">Standalone walkthrough</div>
-        <h1>hj, rendered as a working flow.</h1>
-        <p class="lede">
-          This page was generated from a disposable demo repo using the local
-          binaries from this checkout. It shows the core path from discovery to
-          closeout artifacts, with real command output and real files.
-        </p>
-        <div class="meta">
-          <div class="chip">
-            <strong>Regenerate</strong><br /><code
-              >hj/examples/visual-demo.sh</code
-            >
-          </div>
-          <div class="chip">
-            <strong>Repo root</strong><br /><code>/demo-app</code>
-          </div>
-          <div class="chip">
-            <strong>Output page</strong><br /><code
-              >hj/examples/visual/index.html</code
-            >
-          </div>
+    <section class="layout">
+      <aside class="panel">
+        <p style="margin: 0; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);">Commands</p>
+        <div class="cmd-list">
+          <div class="cmd-item"><code>detect</code><span>Print the expected handoff file path for the current repo, exiting 2 if it does not exist yet.</span></div>
+          <div class="cmd-item"><code>refresh</code><span>Create or repair the <code>.ctx/</code> directory layout and add gitignore rules for state files.</span></div>
+          <div class="cmd-item"><code>handoff</code><span>Record session metadata (build status, test status, notes) and append a log entry to the handoff file.</span></div>
+          <div class="cmd-item"><code>handon</code><span>Print the open and blocked items from the handoff file, grouped by priority, ready for triage.</span></div>
+          <div class="cmd-item"><code>handover</code><span>Render a concise markdown brief from the current handoff state and write it to <code>.ctx/HANDOVER.md</code>.</span></div>
+          <div class="cmd-item"><code>handup</code><span>Walk the directory tree, collect handoff state from each repo found, and emit a machine-readable JSON summary.</span></div>
         </div>
-      </section>
+      </aside>
 
-      <section class="layout">
-        <aside class="panel">
-          <div class="eyebrow">Flow</div>
-          <h2 style="margin-top: 16px; font-size: 2rem">Command path</h2>
-          <div class="flow">
-            <div class="flow-step" data-step="1">
-              <strong>Detect</strong>
-              <span
-                >Resolve the active handoff location inside the disposable
-                repo.</span
-              >
+      <div class="content">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3>Detect and refresh</h3>
+              <p><code>hj detect</code> resolves the canonical handoff file path for the current repo
+              and exits <code>2</code> when the file does not exist yet — useful for scripting and
+              conditional bootstrap. <code>hj refresh</code> creates the <code>.ctx/</code> directory
+              structure and writes gitignore rules so state files are never accidentally committed.</p>
             </div>
-            <div class="flow-step" data-step="2">
-              <strong>Refresh</strong>
-              <span
-                >Create the managed <code>.ctx</code> layout and ignore
-                rules.</span
-              >
-            </div>
-            <div class="flow-step" data-step="3">
-              <strong>Handoff</strong>
-              <span
-                >Persist state, markdown renders, and closeout metadata.</span
-              >
-            </div>
-            <div class="flow-step" data-step="4">
-              <strong>Handon</strong>
-              <span>Wake up into triage grouped by priority and status.</span>
-            </div>
-            <div class="flow-step" data-step="5">
-              <strong>Handover</strong>
-              <span
-                >Generate the compact markdown summary for the next
-                session.</span
-              >
-            </div>
-            <div class="flow-step" data-step="6">
-              <strong>Handup</strong>
-              <span
-                >Survey the repo tree and emit a machine-readable
-                checkpoint.</span
-              >
-            </div>
+            <div class="badge">bootstrap</div>
           </div>
-        </aside>
+          <div class="grid">
+            <div class="terminal"><div class="window-bar">Terminal<div><code>hj detect</code></div></div><pre>/Users/joe/dev/hj/.ctx/HANDOFF.hj.hj.yaml
+</pre></div>
+            <div class="terminal"><div class="window-bar">Terminal<div><code>hj refresh</code></div></div><pre>refreshed /Users/joe/dev/hj/.ctx (packages: conformance, hjlib, hjx)
+</pre></div>
+          </div>
+        </section>
 
-        <div class="content">
-          <section class="card">
-            <div class="card-header">
-              <div>
-                <div class="eyebrow">Step 1</div>
-                <h3 style="margin-top: 14px; font-size: 2rem">
-                  Detect and refresh
-                </h3>
-                <p>
-                  The first two commands establish where state lives and ensure
-                  the repo has managed scaffolding. Before the first handoff
-                  file exists, <code>hj detect</code> still prints the managed
-                  path and exits <code>2</code> to signal that the file is not
-                  there yet.
-                </p>
-              </div>
-              <div class="badge">Project bootstrap</div>
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3>Close out with handoff</h3>
+              <p><code>hj handoff</code> appends a timestamped log entry capturing build status, test
+              status, and free-form notes. Pass <code>--allow-create</code> on first use to write the
+              file from scratch. The demo injects a few open and blocked items directly so the triage
+              and handover views have something interesting to show.</p>
             </div>
-            <div class="grid">
-              <div class="terminal">
-                <div class="window-bar">
-                  Terminal
-                  <div><code>hj detect</code></div>
-                </div>
-                <pre>
-hj/demo-app/.ctx/HANDOFF.demo-app.demo-app.yaml
-[exit 2]</pre
-                >
-              </div>
-              <div class="terminal">
-                <div class="window-bar">
-                  Terminal
-                  <div><code>hj refresh</code></div>
-                </div>
-                <pre>hj/demo-app/.ctx (packages: demo-app)</pre>
-              </div>
-            </div>
-          </section>
-
-          <section class="card">
-            <div class="card-header">
-              <div>
-                <div class="eyebrow">Step 2</div>
-                <h3 style="margin-top: 14px; font-size: 2rem">
-                  Close out with handoff
-                </h3>
-                <p>
-                  The demo bootstraps the handoff files, then injects a few open
-                  and blocked items so the later views are interesting.
-                </p>
-              </div>
-              <div class="badge">State write</div>
-            </div>
-            <div class="grid">
-              <div class="terminal">
-                <div class="window-bar">
-                  Terminal
-                  <div><code>hj handoff --allow-create ...</code></div>
-                </div>
-                <pre>
+            <div class="badge">state write</div>
+          </div>
+          <div class="grid">
+            <div class="terminal"><div class="window-bar">Terminal<div><code>hj handoff --allow-create ...</code></div></div><pre>✓ Created todo: Wire Status Source
+✓ Created todo: Fix Handup Copy [BLOCKED]
+✓ Created todo: Add sqlite smoke coverage
 Closed demo-app
-Handoff: demo-app/.ctx/HANDOFF.demo-app.demo-app.yaml
-State:   demo-app/.ctx/HANDOFF.demo-app.demo-app.state.yaml
-Render:  demo-app/.ctx/HANDOFF.md
-Handover: demo-app/.ctx/HANDOVER.md
-SQLite:  synced 0 item(s) into ~/.local/share/atelier/handoff.db
+Handoff: /Users/joe/dev/hj/.ctx/HANDOFF.hj.hj.yaml
+State:   /Users/joe/dev/hj/.ctx/HANDOFF.hj.hj.state.json
+Render:  /Users/joe/dev/hj/.ctx/HANDOFF.md
+Handover: /Users/joe/dev/hj/.ctx/HANDOVER.md
+SQLite:  synced 3 item(s) into /var/folders/6t/95fl89_n4hsg_gsj0p955xh00000gn/T/tmp.Yx0QtDgtaP/home/.ctx/handoff.db
 Reconciliation — demo-app
-===========================
-Captured in backend:      0 items
-Created this run:         0 items
-Not captured:             0 items
-Orphaned backend items:   0 items
-Closed upstream:          0 items</pre
-                >
-              </div>
-              <div class="artifact">
-                <div class="window-bar">
-                  Artifact
-                  <div><code>HANDOFF.demo-app.demo-app.yaml</code></div>
-                </div>
-                <pre>
-project: demo-app
+───────────────────────────
+Captured in backend        3
+Created this run           3
+Not captured               0
+Orphaned                   0
+Closed upstream            0
+</pre></div>
+            <div class="artifact"><div class="window-bar">Artifact<div><code>HANDOFF.hj.hj.yaml</code></div></div><pre>project: demo-app
 id: demoapp
 updated: 2026-04-16
 items:
@@ -505,202 +178,96 @@ items:
     title: Add sqlite smoke coverage
     description: Cover the basic closeout path against a disposable sqlite file.
     files:
-      - crates/hj-sqlite/src/lib.rs
+      - crates/hjlib/src/sqlite.rs
 log:
   - date: 2026-04-16
     summary: Bootstrap visual demo state
     commits:
-      - abc1234</pre
-                >
-              </div>
-            </div>
-          </section>
+      - abc1234
+</pre></div>
+          </div>
+        </section>
 
-          <section class="card">
-            <div class="card-header">
-              <div>
-                <div class="eyebrow">Step 3</div>
-                <h3 style="margin-top: 14px; font-size: 2rem">
-                  Wake into triage
-                </h3>
-                <p>
-                  <code>hj handon</code> shows the actionable queue the next
-                  time someone picks the repo back up.
-                </p>
-              </div>
-              <div class="badge">Operator view</div>
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3>Wake into triage</h3>
+              <p><code>hj handon</code> reads the handoff file and prints open and blocked items sorted
+              by priority. Run it at the start of a session to see exactly what needs attention before
+              touching any code.</p>
             </div>
-            <div class="grid">
-              <div class="terminal">
-                <div class="window-bar">
-                  Terminal
-                  <div><code>hj handon</code></div>
-                </div>
-                <pre>
-## Handoff Triage — demo-app
-Branch: master | Build: clean | Tests: passing
+            <div class="badge">operator view</div>
+          </div>
+          <div class="grid">
+            <div class="terminal"><div class="window-bar">Terminal<div><code>hj handon</code></div></div><pre>Handoff Triage — /Users/joe/dev/hj
+──────────────────────────────────
+Branch: main | Build: clean | Tests: passing
+Last session: Bootstrap visual demo state
 Visual demo repo.
 
-P0:
-  - [demoapp-2] [fix-handup-copy] &quot;Fix handup copy for onboarding&quot; -&gt; blocked: Waiting on a final wording pass before the onboarding path can ship.
-P1:
-  - [demoapp-1] [wire-status-source] &quot;Wire a real status source&quot; -&gt; open: Replace the placeholder status function with repository-backed state.
-P2:
-  - [demoapp-3] [-] &quot;Add sqlite smoke coverage&quot; -&gt; open: Cover the basic closeout path against a disposable sqlite file.</pre
-                >
-              </div>
+P0  ────────────────────────
+  · demoapp-2            blocked  Fix handup copy for onboarding
+P1  ────────────────────────
+  · demoapp-1            open     Wire a real status source
+P2  ────────────────────────
+  · demoapp-3            open     Add sqlite smoke coverage
+</pre></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3>Generate the handover brief</h3>
+              <p><code>hj handover</code> renders the handoff YAML into a compact markdown document
+              written to <code>.ctx/HANDOVER.md</code>. It is designed to be pasted into a PR
+              description, a chat message, or a commit body — a human-readable snapshot that requires
+              no tooling to read.</p>
             </div>
-          </section>
+            <div class="badge">compact summary</div>
+          </div>
+          <div class="grid">
+            <div class="terminal"><div class="window-bar">Terminal<div><code>hj handover</code></div></div><pre>/Users/joe/dev/hj/.ctx/HANDOVER.md
+</pre></div>
+            <div class="artifact"><div class="window-bar">Artifact<div><code>.ctx/HANDOVER.md</code></div></div><pre></pre></div>
+          </div>
+        </section>
 
-          <section class="card">
-            <div class="card-header">
-              <div>
-                <div class="eyebrow">Step 4</div>
-                <h3 style="margin-top: 14px; font-size: 2rem">
-                  Generate the handover brief
-                </h3>
-                <p>
-                  <code>hj handover</code> distills the current state into a
-                  compact markdown summary meant for the next person or next
-                  session.
-                </p>
-              </div>
-              <div class="badge">Compact summary</div>
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h3>Survey with handup</h3>
+              <p><code>hj handup</code> walks the directory tree up to <code>--max-depth</code> levels,
+              finds every repo with a handoff file, and emits a JSON summary of their state. Useful for
+              cross-repo dashboards, agent orchestration, and morning triage across a whole workspace.</p>
             </div>
-            <div class="grid">
-              <div class="terminal">
-                <div class="window-bar">
-                  Terminal
-                  <div><code>hj handover</code></div>
-                </div>
-                <pre>demo-app/.ctx/HANDOVER.md</pre>
-              </div>
-              <div class="artifact">
-                <div class="window-bar">
-                  Artifact
-                  <div><code>.ctx/HANDOVER.md</code></div>
-                </div>
-                <pre>
-## State
+            <div class="badge">tree survey</div>
+          </div>
+          <div class="grid">
+            <div class="terminal"><div class="window-bar">Terminal<div><code>hj handup --max-depth 3</code></div></div><pre>## handup — /Users/joe/dev/hj (2026-05-01)
 
-Branch: master | Build: clean | Tests: passing
-Visual demo repo.
-
-## Items
-
-| ID | Priority | Status | Title |
-|---|---|---|---|
-| demoapp-2 | P0 | blocked | Fix handup copy for onboarding |
-| demoapp-1 | P1 | open | Wire a real status source |
-| demoapp-3 | P2 | open | Add sqlite smoke coverage |
-
-## Log
-
-- 2026-04-16: Bootstrap visual demo state [abc1234]</pre
-                >
-              </div>
-            </div>
-          </section>
-
-          <section class="card">
-            <div class="card-header">
-              <div>
-                <div class="eyebrow">Step 5</div>
-                <h3 style="margin-top: 14px; font-size: 2rem">
-                  Survey with handup
-                </h3>
-                <p>
-                  <code>hj handup</code> gives a broader, machine-readable
-                  checkpoint for repo scanning and orchestration.
-                </p>
-              </div>
-              <div class="badge">Tree survey</div>
-            </div>
-            <div class="grid">
-              <div class="terminal">
-                <div class="window-bar">
-                  Terminal
-                  <div><code>hj handup --max-depth 3</code></div>
-                </div>
-                <pre>
-## handup — demo-app (2026-04-16)
-
-### demo-app — demo-app
-Branch: master | Build: clean | Tests: passing
+### hj — /Users/joe/dev/hj
+Branch: main | Build: clean | Tests: passing
   P0  [demoapp-2] Fix handup copy for onboarding (status: blocked)
   P1  [demoapp-1] Wire a real status source (status: open)
   P2  [demoapp-3] Add sqlite smoke coverage (status: open)
-  TODO  demo-app/src/lib.rs:2  TODO:
 
 ---
 ## Where to next?
-Highest urgency: demo-app — 1 P0 item(s) need attention
-Suggested: cd demo-app &amp;&amp; /atelier:handon
-Findings written to: ~/.ctx/handoffs/demo-app/HANDUP.json — checkpointed to ~/.ctx/handoffs/handup.db</pre
-                >
-              </div>
-              <div class="artifact">
-                <div class="window-bar">
-                  Artifact
-                  <div><code>HANDUP.json</code></div>
-                </div>
-                <pre>
-{
-  &quot;generated&quot;: &quot;2026-04-16&quot;,
-  &quot;cwd&quot;: &quot;demo-app&quot;,
-  &quot;projects&quot;: [
-    {
-      &quot;name&quot;: &quot;demo-app&quot;,
-      &quot;path&quot;: &quot;demo-app&quot;,
-      &quot;repo_root&quot;: &quot;demo-app&quot;,
-      &quot;handoff_path&quot;: &quot;demo-app/.ctx/HANDOFF.demo-app.demo-app.yaml&quot;,
-      &quot;branch&quot;: &quot;master&quot;,
-      &quot;build&quot;: &quot;clean&quot;,
-      &quot;tests&quot;: &quot;passing&quot;,
-      &quot;items&quot;: [
-        {
-          &quot;id&quot;: &quot;demoapp-1&quot;,
-          &quot;priority&quot;: &quot;P1&quot;,
-          &quot;status&quot;: &quot;open&quot;,
-          &quot;title&quot;: &quot;Wire a real status source&quot;
-        },
-        {
-          &quot;id&quot;: &quot;demoapp-2&quot;,
-          &quot;priority&quot;: &quot;P0&quot;,
-          &quot;status&quot;: &quot;blocked&quot;,
-          &quot;title&quot;: &quot;Fix handup copy for onboarding&quot;
-        },
-        {
-          &quot;id&quot;: &quot;demoapp-3&quot;,
-          &quot;priority&quot;: &quot;P2&quot;,
-          &quot;status&quot;: &quot;open&quot;,
-          &quot;title&quot;: &quot;Add sqlite smoke coverage&quot;
-        }
-      ],
-      &quot;todos&quot;: [
-        &quot;demo-app/src/lib.rs:2  TODO:&quot;
-      ]
-    }
-  ],
-  &quot;recommendation&quot;: {
-    &quot;project&quot;: &quot;demo-app&quot;,
-    &quot;reason&quot;: &quot;1 P0 item(s) need attention&quot;
-  }
-}</pre
-                >
-              </div>
-            </div>
-          </section>
+Highest urgency: hj — 1 P0 item(s) need attention
+Suggested: cd /Users/joe/dev/hj &amp;&amp; /atelier:handon
+Findings written to: /var/folders/6t/95fl89_n4hsg_gsj0p955xh00000gn/T/tmp.Yx0QtDgtaP/home/.ctx/handoffs/hj/HANDUP.json — checkpointed to /var/folders/6t/95fl89_n4hsg_gsj0p955xh00000gn/T/tmp.Yx0QtDgtaP/home/.ctx/handoffs/handup.db
+</pre></div>
+            <div class="artifact"><div class="window-bar">Artifact<div><code>HANDUP.json</code></div></div><pre></pre></div>
+          </div>
+        </section>
 
-          <section class="panel footer">
-            The remaining command-specific demos still live under
-            <code>examples/commands/</code>, including <code>reconcile</code>,
-            <code>audit</code>, <code>install</code>, and <code>update</code>.
-            This visual page focuses on the core local workflow that works
-            without external services.
-          </section>
-        </div>
-      </section>
-    </main>
-  </body>
+        <section class="panel footer">
+          Command-specific examples live under <code>examples/commands/</code> --
+          covering <code>reconcile</code>, <code>audit</code>, <code>install</code>, <code>update</code>, and more.
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
 </html>

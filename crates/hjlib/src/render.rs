@@ -48,7 +48,7 @@ pub fn render_markdown(handoff: &Handoff, state: Option<&HandoffState>) -> Strin
             out.push_str(&format!(
                 "- {date}: {} [{}]\n",
                 entry.summary,
-                entry.commits.join(", ")
+                entry.commits.iter().map(|c| c.sha()).collect::<Vec<_>>().join(", ")
             ));
         }
     }
@@ -102,7 +102,7 @@ pub fn render_handover_markdown(handoff: &Handoff, state: Option<&HandoffState>)
             out.push_str(&format!(
                 "- {date}: {} [{}]\n",
                 entry.summary,
-                entry.commits.join(", ")
+                entry.commits.iter().map(|c| c.sha()).collect::<Vec<_>>().join(", ")
             ));
         }
     }
@@ -160,7 +160,7 @@ mod tests {
             log: vec![LogEntry {
                 date: Some("2026-04-15".into()),
                 summary: "Scaffolded workspace".into(),
-                commits: vec!["abc1234".into()],
+                commits: vec![crate::CommitRef::Sha("abc1234".into())],
                 ..LogEntry::default()
             }],
             ..Handoff::default()
@@ -191,7 +191,7 @@ mod tests {
             log: vec![LogEntry {
                 date: Some("2026-04-15".into()),
                 summary: "Scaffolded workspace".into(),
-                commits: vec!["abc1234".into()],
+                commits: vec![crate::CommitRef::Sha("abc1234".into())],
                 ..LogEntry::default()
             }],
             ..Handoff::default()

@@ -2,8 +2,16 @@
 
 Generate a standalone HTML walkthrough of the main local `hj` flow:
 
+With bash:
+
 ```bash
 ./examples/visual-demo.sh
+```
+
+With nushell:
+
+```bash
+./examples/visual-demo.nu
 ```
 
 That script:

@@ -1,40 +1,43 @@
-project: hj
-id: hj
-updated: 2026-04-28
-items: []
+project: demo-app
+id: demoapp
+updated: 2026-05-01
+items:
+- id: demoapp-1
+  doob_uuid: null
+  name: wire-status-source
+  priority: P1
+  status: open
+  title: Wire a real status source
+  description: Replace the placeholder status function with repository-backed state.
+  files:
+  - src/lib.rs
+  completed: null
+  extra: []
+- id: demoapp-2
+  doob_uuid: null
+  name: fix-handup-copy
+  priority: P0
+  status: blocked
+  title: Fix handup copy for onboarding
+  description: Waiting on a final wording pass before the onboarding path can ship.
+  files:
+  - README.md
+  - .ctx/HANDOVER.md
+  completed: null
+  extra: []
+- id: demoapp-3
+  doob_uuid: null
+  name: null
+  priority: P2
+  status: open
+  title: Add sqlite smoke coverage
+  description: Cover the basic closeout path against a disposable sqlite file.
+  files:
+  - crates/hjlib/src/sqlite.rs
+  completed: null
+  extra: []
 log:
-- date: 20260428:131508
-  summary: Collapsed 6-crate workspace into 2 crates (hjlib + hjx); all 121 tests pass, clippy clean.
-  commits: []
-  session: 10
-- date: 2026-04-26
-  summary: |
-    Improved terminal output formatting and wire hj-cli log persistence. Added period as date.time
-    delimiter in handoff dates, accepted {sha, branch} object form in log.commits, moved default db
-    path from ~/.local/share/atelier/ to ~/.ctx/, wired log persistence with JSONL append and
-    last_log into close/handon/handover, added last_log field to HandoffState, and improved hj-cli
-    terminal output formatting. All six commits landed on main.
+- date: 2026-04-16
+  summary: Bootstrap visual demo state
   commits:
-  - 7b970cf
-  - dcf07de
-  - 5031d67
-  - 19703d3
-  - 8a522d0
-  - 0ff096b
-- date: 2026-04-22
-  summary: Reviewed hj-cli output formatting and dashbox mermaid renderer; no code changes this session.
-  commits: []
-  session: 8
-- date: 2026-04-16
-  summary: |
-    Fixed explicit and migrated nested handoff targeting so sibling state paths and project names
-    rebind to the resolved HANDOFF file, and covered the regression with hj-cli tests.
-  commits: []
-  session: 7
-- date: 2026-04-16
-  summary: |
-    Moved reconcile planning into hj-core so the handoff flow can target any todo backend, updated
-    hj-doob to expose backend snapshots, and added runnable command demos plus docs for the example
-    flows.
-  commits: []
-  session: 6
+  - abc1234

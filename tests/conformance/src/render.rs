@@ -163,7 +163,7 @@ fn s5_4_log_entry_with_commits_includes_sha() {
         log: vec![LogEntry {
             date: Some("2026-04-18".into()),
             summary: "Did the thing".into(),
-            commits: vec!["abc1234".into()],
+            commits: vec![hjlib::CommitRef::Sha("abc1234".into())],
             ..LogEntry::default()
         }],
         ..Handoff::default()

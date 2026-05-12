@@ -14,7 +14,7 @@ HANDUP_BIN="$REPO_ROOT/target/debug/handup"
 ensure_hj_built() {
   (
     cd "$REPO_ROOT"
-    env RUSTC_WRAPPER= cargo build -p hj-cli --bins >/dev/null
+    env RUSTC_WRAPPER= cargo build -p hjx --bins >/dev/null
   )
 }
 

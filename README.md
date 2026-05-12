@@ -30,25 +30,25 @@ project: myproject
 id: myproject
 updated: 2026-04-30
 items:
-  - id: mp-1
-    priority: P1
-    status: open
-    title: Wire the render pass
-    description: |
-      Description of what needs doing and why.
-    files:
-      - src/render.rs
-  - id: mp-2
-    priority: P2
-    status: done
-    title: Add conformance tests
-    completed: 2026-04-28
+    - id: mp-1
+      priority: P1
+      status: open
+      title: Wire the render pass
+      description: |
+          Description of what needs doing and why.
+      files:
+          - src/render.rs
+    - id: mp-2
+      priority: P2
+      status: done
+      title: Add conformance tests
+      completed: 2026-04-28
 log:
-  - date: 20260428:131508
-    summary: Shipped render pass skeleton, all tests pass.
-    commits:
-      - sha: abc1234
-        branch: main
+    - date: 20260428:131508
+      summary: Shipped render pass skeleton, all tests pass.
+      commits:
+          - sha: abc1234
+            branch: main
 ```
 
 Items have `status: open | blocked | done`. The `log` section grows with each session.
@@ -87,32 +87,32 @@ hj update
 
 ## Installed Binaries
 
-| Binary           | Equivalent            |
-| ---------------- | --------------------- |
-| `hj`             | Main CLI              |
-| `handoff`        | `hj handoff`          |
-| `handon`         | `hj handon`           |
-| `handover`       | `hj handover`         |
-| `handoff-detect` | `hj detect`           |
-| `handoff-db`     | `hj handoff-db`       |
-| `handup`         | `hj handup`           |
+| Binary           | Equivalent      |
+| ---------------- | --------------- |
+| `hj`             | Main CLI        |
+| `handoff`        | `hj handoff`    |
+| `handon`         | `hj handon`     |
+| `handover`       | `hj handover`   |
+| `handoff-detect` | `hj detect`     |
+| `handoff-db`     | `hj handoff-db` |
+| `handup`         | `hj handup`     |
 
 ## Commands
 
-| Command         | What it does                                                                               |
-| --------------- | ------------------------------------------------------------------------------------------ |
-| `hj detect`     | Resolve the active handoff path, repo root, or project name                                |
-| `hj handon`     | Print grouped P0/P1/P2 triage from the current handoff                                     |
-| `hj handoff`    | Append a log entry, write `HANDOFF.md` + `HANDOVER.md`, sync SQLite, reconcile with doob  |
-| `hj close`      | Alias for `hj handoff`                                                                     |
-| `hj handover`   | Regenerate `.ctx/HANDOVER.md` from the current handoff and session state                   |
-| `hj handoff-db` | Inspect or update the handoff SQLite store                                                 |
-| `hj handup`     | Scan nested repos and TODO markers, emit a handup report                                   |
-| `hj refresh`    | Scaffold `.ctx/` and add gitignore entries for state files                                 |
-| `hj reconcile`  | Create missing doob todos for open handoff items                                           |
-| `hj audit`      | Report handoff items not covered by doob, without mutating state                           |
-| `hj install`    | Install binaries from the current checkout into `~/.local/bin`                             |
-| `hj update`     | Update installed binaries to the latest published `hjx` release                           |
+| Command         | What it does                                                                             |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `hj detect`     | Resolve the active handoff path, repo root, or project name                              |
+| `hj handon`     | Print grouped P0/P1/P2 triage from the current handoff                                   |
+| `hj handoff`    | Append a log entry, write `HANDOFF.md` + `HANDOVER.md`, sync SQLite, reconcile with doob |
+| `hj close`      | Alias for `hj handoff`                                                                   |
+| `hj handover`   | Regenerate `.ctx/HANDOVER.md` from the current handoff and session state                 |
+| `hj handoff-db` | Inspect or update the handoff SQLite store                                               |
+| `hj handup`     | Scan nested repos and TODO markers, emit a handup report                                 |
+| `hj refresh`    | Scaffold `.ctx/` and add gitignore entries for state files                               |
+| `hj reconcile`  | Create missing doob todos for open handoff items                                         |
+| `hj audit`      | Report handoff items not covered by doob, without mutating state                         |
+| `hj install`    | Install binaries from the current checkout into `~/.local/bin`                           |
+| `hj update`     | Update installed binaries to the latest published `hjx` release                          |
 
 ### Key flags
 
@@ -182,10 +182,10 @@ hj handover
 
 ## Workspace Crates
 
-| Crate   | Role                                                             |
-| ------- | ---------------------------------------------------------------- |
-| `hjlib` | Library: models, detect, git, render, doob, sqlite              |
-| `hjx`   | Binary: CLI entrypoints, Clap arg parsing, command dispatch      |
+| Crate   | Role                                                        |
+| ------- | ----------------------------------------------------------- |
+| `hjlib` | Library: models, detect, git, render, doob, sqlite          |
+| `hjx`   | Binary: CLI entrypoints, Clap arg parsing, command dispatch |
 
 ## Development
 

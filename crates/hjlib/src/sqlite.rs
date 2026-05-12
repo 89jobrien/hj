@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use anyhow::{Context, Result, anyhow};
 use rusqlite::{Connection, params, params_from_iter};
 
-use crate::{Handoff, LogEntry};
+use crate::{CommitRef, Handoff, LogEntry};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct HandoffRow {
@@ -178,7 +178,8 @@ impl HandoffDb {
         let mut entries = Vec::new();
         for row in rows {
             let (date, summary, commits_json) = row?;
-            let commits: Vec<String> = serde_json::from_str(&commits_json).unwrap_or_default();
+            let sha_list: Vec<String> = serde_json::from_str(&commits_json).unwrap_or_default();
+            let commits = sha_list.into_iter().map(CommitRef::Sha).collect();
             entries.push(LogEntry {
                 date: Some(date),
                 summary,
@@ -515,9 +516,9 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].date.as_deref(), Some("2026-04-22"));
         assert_eq!(entries[0].summary, "wired log persistence");
-        assert_eq!(entries[0].commits, vec!["abc1234".to_string()]);
+        assert_eq!(entries[0].commits, vec![crate::CommitRef::Sha("abc1234".into())]);
         assert_eq!(entries[1].date.as_deref(), Some("2026-04-21"));
-        assert_eq!(entries[1].commits, Vec::<String>::new());
+        assert_eq!(entries[1].commits, Vec::<crate::CommitRef>::new());
     }
 
     #[test]
