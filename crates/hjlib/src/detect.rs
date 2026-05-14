@@ -319,6 +319,7 @@ pub fn write_gitignore_block(repo_root: &Path) -> Result<()> {
         "# handoff-begin",
         ".ctx/*",
         "!.ctx/HANDOFF.*.yaml",
+        ".ctx/HANDOFF.godmode.*.yaml",
         ".ctx/HANDOFF.*.state.json",
         "!.ctx/handoff.*.config.toml.example",
         ".ctx/HANDOFF.*.*.state.json",
@@ -439,6 +440,7 @@ mod tests {
         assert!(updated.contains(".ctx/*"));
         assert!(updated.contains(".ctx/HANDOFF.*.*.state.json"));
         assert!(updated.contains(".ctx/HANDOFF.hj.hj.state.json"));
+        assert!(updated.contains(".ctx/HANDOFF.godmode.*.yaml"));
         assert!(updated.contains("target/"));
         assert!(updated.contains("node_modules/"));
         assert!(!updated.contains("\nold\n"));
