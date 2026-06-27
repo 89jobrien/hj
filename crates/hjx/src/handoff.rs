@@ -536,14 +536,52 @@ fn reconcile_handoff(
 fn append_jsonl_log(project: &str, date: &str, summary: &str, commits: &[String]) -> Result<()> {
     let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
     let log_path = home.join(".ctx/handoff-log.jsonl");
+    append_jsonl_log_to(project, date, summary, commits, &log_path)
+}
+
+fn append_jsonl_log_to(
+    project: &str,
+    date: &str,
+    summary: &str,
+    commits: &[String],
+    log_path: &std::path::Path,
+) -> Result<()> {
     if let Some(parent) = log_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
+
+    // Dedup: skip if (date, project, commits) already present in last 50 entries
+    if log_path.exists() {
+        let content = fs::read_to_string(log_path)
+            .with_context(|| format!("failed to read {}", log_path.display()))?;
+        let already_logged = content
+            .lines()
+            .rev()
+            .take(50)
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .any(|entry| {
+                let same_date = entry.get("date").and_then(|v| v.as_str()) == Some(date);
+                let same_project = entry.get("project").and_then(|v| v.as_str()) == Some(project);
+                if !same_date || !same_project {
+                    return false;
+                }
+                let logged: Vec<&str> = entry
+                    .get("commits")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+                    .unwrap_or_default();
+                logged == commits.iter().map(String::as_str).collect::<Vec<_>>()
+            });
+        if already_logged {
+            return Ok(());
+        }
+    }
+
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&log_path)
+        .open(log_path)
         .with_context(|| format!("failed to open {}", log_path.display()))?;
     let line = serde_json::json!({
         "date": date,
@@ -700,8 +738,9 @@ mod tests {
     use hjlib::{ExtraEntry, Handoff, HandoffItem, HandoffPaths};
 
     use super::{
-        IssueAction, apply_handoff_rows, collect_review_on_wake, detect_issue_transitions,
-        project_from_handoff_path, rebind_paths_for_handoff, validate_and_repair,
+        IssueAction, append_jsonl_log_to, apply_handoff_rows, collect_review_on_wake,
+        detect_issue_transitions, project_from_handoff_path, rebind_paths_for_handoff,
+        validate_and_repair,
     };
 
     #[test]
@@ -926,6 +965,38 @@ mod tests {
             ..Handoff::default()
         };
         assert!(detect_issue_transitions(&old, &handoff).is_empty());
+    }
+
+    #[test]
+    fn append_jsonl_log_skips_duplicate_commits() {
+        let dir = tempfile::tempdir().unwrap();
+        let log_path = dir.path().join("handoff-log.jsonl");
+
+        append_jsonl_log_to("test-proj", "2026-06-27", "first write", &["abc123".to_string()], &log_path).unwrap();
+        append_jsonl_log_to("test-proj", "2026-06-27", "duplicate", &["abc123".to_string()], &log_path).unwrap();
+
+        let lines: Vec<_> = std::fs::read_to_string(&log_path)
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
+        assert_eq!(lines.len(), 1, "duplicate (date, project, commits) must be skipped");
+    }
+
+    #[test]
+    fn append_jsonl_log_allows_different_commits() {
+        let dir = tempfile::tempdir().unwrap();
+        let log_path = dir.path().join("handoff-log.jsonl");
+
+        append_jsonl_log_to("proj", "2026-06-27", "a", &["sha1".to_string()], &log_path).unwrap();
+        append_jsonl_log_to("proj", "2026-06-27", "b", &["sha2".to_string()], &log_path).unwrap();
+
+        let lines: Vec<_> = std::fs::read_to_string(&log_path)
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
+        assert_eq!(lines.len(), 2);
     }
 
     #[test]
