@@ -1,43 +1,36 @@
-project: demo-app
-id: demoapp
-updated: 2026-05-01
-items:
-- id: demoapp-1
-  doob_uuid: null
-  name: wire-status-source
-  priority: P1
-  status: open
-  title: Wire a real status source
-  description: Replace the placeholder status function with repository-backed state.
-  files:
-  - src/lib.rs
-  completed: null
-  extra: []
-- id: demoapp-2
-  doob_uuid: null
-  name: fix-handup-copy
-  priority: P0
-  status: blocked
-  title: Fix handup copy for onboarding
-  description: Waiting on a final wording pass before the onboarding path can ship.
-  files:
-  - README.md
-  - .ctx/HANDOVER.md
-  completed: null
-  extra: []
-- id: demoapp-3
-  doob_uuid: null
-  name: null
-  priority: P2
-  status: open
-  title: Add sqlite smoke coverage
-  description: Cover the basic closeout path against a disposable sqlite file.
-  files:
-  - crates/hjlib/src/sqlite.rs
-  completed: null
-  extra: []
-log:
-- date: 2026-04-16
-  summary: Bootstrap visual demo state
-  commits:
-  - abc1234
+project: hj
+id: hj
+updated: 2026-08-23
+branch: main
+head_sha: 7a34577c7871e09fca8fa11ffd8b19cf84612af9
+commits_since_last_handoff: 2
+pushed: true
+upstream_status: in-sync
+tests_run: 68
+tests_passed: 68
+tests_failed: 0
+build_status: clean
+dirty: false
+untracked_files:
+  - .ctx/HANDOFF.dedup-test.hj.yaml
+recent_commits:
+  - sha: 7a34577
+    message: "fix(handoff): skip duplicate (date, project, commits) in jsonl log"
+    date: 2026-06-27
+  - sha: 13a62e0
+    message: "fix(gitignore): re-ignore HANDOFF.godmode.*.yaml state files"
+    date: 2026-06-27
+  - sha: 28e81be
+    message: "Add CommitRef and update log handling"
+    date: 2026-06-20
+summary: |
+  Clean build state. Last work on 2026-06-27 fixed handoff deduplication logic
+  in jsonl log formatting. All 68 unit tests passing. Repository is in sync with
+  upstream. One untracked test file (.ctx/HANDOFF.dedup-test.hj.yaml) from e2e
+  dedup testing.
+blockers: null
+notes: |
+  - Workspace: Rust 2024 edition, two crates (hjlib, hjx)
+  - Test harness uses conformance suite at tests/conformance/
+  - Release workflow present; binstall metadata configured
+  - One untracked HANDOFF file from test run — can be safely ignored or cleaned
