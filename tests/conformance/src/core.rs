@@ -1,3 +1,5 @@
+//! Conformance tests for pure handoff domain and reconciliation rules.
+
 // §1 — hj-core pure domain contracts
 
 use hjlib::{
@@ -304,7 +306,7 @@ fn s1_7_default_id_prefix_exact_seven() {
     assert_eq!(default_id_prefix("atelier"), "atelier");
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// Fixtures shared by the core contract tests.
 
 fn open_item(id: &str, title: &str) -> HandoffItem {
     HandoffItem {

@@ -1,3 +1,5 @@
+//! Cross-repository handoff survey, recommendation, and checkpoint generation.
+
 use std::{
     collections::BTreeMap,
     fs,

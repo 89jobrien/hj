@@ -1,3 +1,5 @@
+//! CLI composition root shared by `hj` and its compatibility executables.
+
 mod alias;
 mod cli;
 mod handoff;
@@ -11,6 +13,7 @@ use clap::Parser;
 use cli::{Cli, Commands};
 use hjlib::ReconcileMode;
 
+/// Runs the CLI, prints a contextual error, and exits nonzero on failure.
 pub fn main_entry() {
     if let Err(error) = run() {
         eprintln!("error: {error:#}");
@@ -18,6 +21,7 @@ pub fn main_entry() {
     }
 }
 
+/// Parses alias-aware arguments and dispatches the selected command.
 pub fn run() -> Result<()> {
     let cli = Cli::parse_from(alias::rewrite_args_for_alias(std::env::args_os()));
     match cli.command {

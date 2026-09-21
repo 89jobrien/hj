@@ -1,3 +1,5 @@
+//! Conformance tests for handoff and handup SQLite persistence.
+
 // §2 — hj-sqlite → hj-core adapter contracts
 
 use hjlib::sqlite::{HandoffDb, HandupCheckpoint, HandupDb};
@@ -226,7 +228,7 @@ fn s2_4_checkpoint_appends_not_replaces() {
     assert_eq!(count, 2, "each checkpoint call must insert a new row");
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// Fixtures shared by the SQLite adapter tests.
 
 fn item(id: &str, priority: &str, status: &str) -> HandoffItem {
     HandoffItem {

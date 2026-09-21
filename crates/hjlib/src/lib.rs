@@ -1,3 +1,5 @@
+//! Handoff domain models, validation, repair, and todo reconciliation rules.
+
 pub mod detect;
 pub mod doob;
 pub mod git;
@@ -32,6 +34,7 @@ pub enum CommitRef {
 }
 
 impl CommitRef {
+    /// Returns the commit SHA regardless of its serialized form.
     pub fn sha(&self) -> &str {
         match self {
             CommitRef::Sha(s) => s,
@@ -333,16 +336,19 @@ pub struct ReconcilePlan {
 }
 
 impl Handoff {
+    /// Iterates over items whose status is `open` or `blocked`.
     pub fn active_items(&self) -> impl Iterator<Item = &HandoffItem> {
         self.items.iter().filter(|item| item.is_open_or_blocked())
     }
 
+    /// Sets the project name when it is absent or empty.
     pub fn ensure_project(&mut self, project: &str) {
         if self.project.as_deref().unwrap_or_default().is_empty() {
             self.project = Some(project.to_string());
         }
     }
 
+    /// Reports malformed items, duplicate IDs, and incomplete log entries.
     pub fn validate(&self) -> Vec<ValidationWarning> {
         let mut warnings = Vec::new();
 
@@ -383,6 +389,7 @@ impl Handoff {
         warnings
     }
 
+    /// Moves log-shaped records out of `items` and returns repair descriptions.
     pub fn repair(&mut self) -> Vec<String> {
         let mut descriptions = Vec::new();
         let mut kept_items = Vec::new();
@@ -471,6 +478,7 @@ impl Handoff {
         item.extra_fields.contains_key("summary") && item.extra_fields.contains_key("commits")
     }
 
+    /// Sets a default handoff ID prefix when none is present.
     pub fn ensure_id_prefix(&mut self, project: &str) {
         if self.id.as_deref().unwrap_or_default().is_empty() {
             self.id = Some(default_id_prefix(project));
@@ -479,10 +487,12 @@ impl Handoff {
 }
 
 impl HandoffItem {
+    /// Returns whether the item participates in active-work views.
     pub fn is_open_or_blocked(&self) -> bool {
         matches!(self.status.as_deref(), Some("open" | "blocked"))
     }
 
+    /// Builds the todo title, preferring `name` and marking blocked items.
     pub fn todo_title(&self) -> String {
         let base = self
             .name
@@ -499,10 +509,12 @@ impl HandoffItem {
         }
     }
 
+    /// Returns the title used when synchronizing this item to `doob`.
     pub fn doob_title(&self) -> String {
         self.todo_title()
     }
 
+    /// Returns distinct plain and blocked title forms used for matching.
     pub fn title_variants(&self) -> Vec<String> {
         let mut variants = Vec::new();
         let title = self.title.clone();
@@ -523,6 +535,7 @@ impl HandoffItem {
         variants
     }
 
+    /// Returns the explicit priority or infers one from the item text.
     pub fn inferred_priority(&self) -> String {
         self.priority
             .clone()
@@ -531,15 +544,18 @@ impl HandoffItem {
     }
 }
 
+/// Normalizes a project name for use in IDs and file names.
 pub fn sanitize_name(raw: &str) -> String {
     raw.trim().to_ascii_lowercase().replace([' ', '/'], "-")
 }
 
+/// Returns up to seven normalized characters for a handoff ID prefix.
 pub fn default_id_prefix(project: &str) -> String {
     let cleaned = sanitize_name(project);
     cleaned.chars().take(7).collect()
 }
 
+/// Converts a hyphen-separated slug into a space-separated title.
 pub fn titleize_slug(slug: &str) -> String {
     slug.split('-')
         .filter(|part| !part.is_empty())
@@ -558,6 +574,7 @@ pub fn titleize_slug(slug: &str) -> String {
         .join(" ")
 }
 
+/// Infers `P0`, `P1`, or `P2` from urgency and implementation keywords.
 pub fn infer_priority(title: &str, description: Option<&str>) -> String {
     let title = title.to_ascii_lowercase();
     let description = description.unwrap_or_default().to_ascii_lowercase();
@@ -596,6 +613,7 @@ pub fn infer_priority(title: &str, description: Option<&str>) -> String {
     "P2".to_string()
 }
 
+/// Compares active handoff items with a todo snapshot and plans missing creates.
 pub fn build_reconcile_plan(
     project: &str,
     handoff: &Handoff,

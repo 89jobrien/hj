@@ -1,0 +1,26 @@
+project: dedup-test
+id: dedup-t
+updated: 2026-06-28
+items: []
+log:
+- date: 2026-06-28
+  summary: e2e test run 2 duplicate
+  commits:
+  - !Object
+    sha: bbb0001
+    branch: main
+- date: 2026-06-28
+  summary: e2e test run 1
+  commits: []
+- date: 2026-06-28
+  summary: e2e test run 2 duplicate
+  commits: []
+- date: 2026-06-28
+  summary: e2e test run 1
+  commits: []
+- date: 2026-06-28
+  summary: e2e dedup test run 2 (duplicate)
+  commits: []
+- date: 2026-06-28
+  summary: e2e dedup test run 1
+  commits: []

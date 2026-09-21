@@ -1,3 +1,5 @@
+//! Rewrites compatibility executable names into `hj` subcommands.
+
 use std::{ffi::OsString, path::Path};
 
 pub(crate) fn rewrite_args_for_alias(args: impl IntoIterator<Item = OsString>) -> Vec<OsString> {

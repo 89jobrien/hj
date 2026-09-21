@@ -1,3 +1,5 @@
+//! Conformance tests for the `doob` adapter's mapping and title rules.
+
 // §3 — hj-doob → hj-core adapter contracts
 // §3.3 (DoobClient::snapshot) is an integration test skipped without live doob.
 

@@ -1,3 +1,5 @@
+//! Clap command and argument definitions for the `hj` command family.
+
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};

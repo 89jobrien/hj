@@ -1,3 +1,5 @@
+//! SQLite persistence for handoff items, logs, and handup checkpoints.
+
 use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
@@ -39,6 +41,7 @@ pub struct HandupDb {
 }
 
 impl HandoffDb {
+    /// Opens the default handoff database location under the user's home directory.
     pub fn new() -> Result<Self> {
         let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
         Ok(Self {
@@ -46,16 +49,19 @@ impl HandoffDb {
         })
     }
 
+    /// Targets an explicit database path.
     pub fn with_path(db_path: PathBuf) -> Self {
         Self { db_path }
     }
 
+    /// Creates or migrates the handoff schema and returns the database path.
     pub fn init(&self) -> Result<PathBuf> {
         let connection = self.open()?;
         Self::init_schema(&connection)?;
         Ok(self.db_path.clone())
     }
 
+    /// Synchronizes one project's items and removes rows absent from the handoff.
     pub fn upsert(&self, project: &str, handoff: &Handoff, today: &str) -> Result<UpsertReport> {
         let mut connection = self.open()?;
         Self::init_schema(&connection)?;
@@ -93,6 +99,7 @@ impl HandoffDb {
         })
     }
 
+    /// Loads one project's items ordered by priority and ID.
     pub fn query(&self, project: &str) -> Result<Vec<HandoffRow>> {
         let connection = self.open()?;
         Self::init_schema(&connection)?;
@@ -123,10 +130,12 @@ impl HandoffDb {
         Ok(items)
     }
 
+    /// Marks an existing item done and records its completion date.
     pub fn complete(&self, project: &str, id: &str, today: &str) -> Result<bool> {
         self.update_status(project, id, "done", Some(today), today)
     }
 
+    /// Updates an existing item's status and modification date.
     pub fn set_status(&self, project: &str, id: &str, status: &str, today: &str) -> Result<bool> {
         self.update_status(project, id, status, None, today)
     }
@@ -143,6 +152,7 @@ impl HandoffDb {
             .with_context(|| format!("failed to open {}", self.db_path.display()))
     }
 
+    /// Appends a serialized session log entry for a project.
     pub fn log_append(
         &self,
         project: &str,
@@ -161,6 +171,7 @@ impl HandoffDb {
         Ok(())
     }
 
+    /// Loads a project's session log in newest-first insertion order.
     pub fn log_query(&self, project: &str) -> Result<Vec<LogEntry>> {
         let connection = self.open()?;
         Self::init_schema(&connection)?;
@@ -265,6 +276,7 @@ impl HandoffDb {
 }
 
 impl HandupDb {
+    /// Opens the default handup checkpoint database under the user's home directory.
     pub fn new() -> Result<Self> {
         let home = dirs::home_dir().ok_or_else(|| anyhow!("could not determine home directory"))?;
         Ok(Self {
@@ -272,10 +284,12 @@ impl HandupDb {
         })
     }
 
+    /// Targets an explicit checkpoint database path.
     pub fn with_path(db_path: PathBuf) -> Self {
         Self { db_path }
     }
 
+    /// Appends a handup report checkpoint and returns the database path.
     pub fn checkpoint(&self, checkpoint: &HandupCheckpoint) -> Result<PathBuf> {
         let connection = self.open()?;
         Self::init_schema(&connection)?;

@@ -118,7 +118,7 @@ hj update
 
 `hj handoff` / `hj close`:
 
-```
+```text
 --log-summary <TEXT>   Session summary appended to the log
 --commit <SHA>         Commit SHA(s) to attach (repeatable)
 --build <STATUS>       Build state to record (e.g. clean, failing)
@@ -132,7 +132,7 @@ hj update
 
 `hj detect`:
 
-```
+```text
 --name     Print the inferred project name
 --root     Print the repo root
 --project  Print the resolved project slug

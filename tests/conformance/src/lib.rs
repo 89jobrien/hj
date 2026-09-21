@@ -1,3 +1,5 @@
+//! Conformance tests for the workspace boundary contracts.
+
 // Conformance test suite — hj workspace boundary contracts.
 // Each module maps to one spec section in .ctx/conformance.md.
 

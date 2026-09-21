@@ -1,3 +1,5 @@
+//! Installation and crates.io update commands for the `hj` binaries.
+
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},

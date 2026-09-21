@@ -1,3 +1,5 @@
+//! Repository discovery, project naming, and `.ctx` path initialization.
+
 use std::{
     ffi::OsStr,
     fs,
@@ -35,6 +37,7 @@ pub struct RefreshReport {
     pub packages: Vec<String>,
 }
 
+/// Finds the enclosing Git repository and canonicalizes the working directory.
 pub fn discover(cwd: &Path) -> Result<RepoContext> {
     let repo_root =
         git_output(cwd, ["rev-parse", "--show-toplevel"]).context("not in a git repository")?;
@@ -54,10 +57,12 @@ pub fn discover(cwd: &Path) -> Result<RepoContext> {
 }
 
 impl RepoContext {
+    /// Derives a sanitized project name from the nearest supported manifest.
     pub fn project_name(&self) -> Result<String> {
         derive_project_name(&self.cwd, &self.repo_root)
     }
 
+    /// Resolves the managed handoff, state, and rendered document paths.
     pub fn paths(&self, explicit_project: Option<&str>) -> Result<HandoffPaths> {
         let project = explicit_project
             .map(ToOwned::to_owned)
@@ -81,6 +86,7 @@ impl RepoContext {
         })
     }
 
+    /// Initializes `.ctx` state files and the managed `.gitignore` block.
     pub fn refresh(&self, force: bool) -> Result<RefreshReport> {
         let ctx_dir = self.repo_root.join(".ctx");
         let token = ctx_dir.join(".initialized");
@@ -121,6 +127,7 @@ impl RepoContext {
         Ok(RefreshReport { ctx_dir, packages })
     }
 
+    /// Moves a legacy root-level handoff to `target`, preferring `git mv`.
     pub fn migrate_root_handoff(&self, target: &Path) -> Result<Option<PathBuf>> {
         let old = find_root_handoff(&self.repo_root)?;
         let Some(old) = old else {
@@ -156,24 +163,28 @@ impl RepoContext {
     }
 }
 
+/// Returns the current Git branch name for `repo_root`.
 pub fn branch_name(repo_root: &Path) -> Result<String> {
     Ok(git_output(repo_root, ["branch", "--show-current"])?
         .trim()
         .to_string())
 }
 
+/// Returns the abbreviated commit ID at `HEAD`.
 pub fn current_short_head(repo_root: &Path) -> Result<String> {
     Ok(git_output(repo_root, ["rev-parse", "--short", "HEAD"])?
         .trim()
         .to_string())
 }
 
+/// Returns the local date in `YYYY-MM-DD` format.
 pub fn today(cwd: &Path) -> Result<String> {
     Ok(command_output("date", cwd, ["+%Y-%m-%d"])?
         .trim()
         .to_string())
 }
 
+/// Derives a project name from `cwd`, then the repository root, then the directory name.
 pub fn derive_project_name(cwd: &Path, repo_root: &Path) -> Result<String> {
     if let Some(name) = manifest_name(cwd)? {
         return Ok(sanitize_name(&name));
@@ -189,6 +200,7 @@ pub fn derive_project_name(cwd: &Path, repo_root: &Path) -> Result<String> {
     Ok(sanitize_name(name))
 }
 
+/// Reads a project name from Cargo, Python, Poetry, or Go metadata in `dir`.
 pub fn manifest_name(dir: &Path) -> Result<Option<String>> {
     let cargo = dir.join("Cargo.toml");
     if cargo.exists() {
@@ -249,6 +261,7 @@ pub fn manifest_name(dir: &Path) -> Result<Option<String>> {
     Ok(None)
 }
 
+/// Recursively collects unique project names from supported manifests.
 pub fn scan_package_names(repo_root: &Path) -> Result<Vec<String>> {
     let mut packages = Vec::new();
 
@@ -293,6 +306,7 @@ pub fn scan_package_names(repo_root: &Path) -> Result<Vec<String>> {
     Ok(packages)
 }
 
+/// Returns the lexicographically first root-level `HANDOFF.*.yaml` file.
 pub fn find_root_handoff(repo_root: &Path) -> Result<Option<PathBuf>> {
     let mut matches = Vec::new();
     for entry in fs::read_dir(repo_root)? {
@@ -312,6 +326,7 @@ pub fn find_root_handoff(repo_root: &Path) -> Result<Option<PathBuf>> {
     Ok(matches.into_iter().next())
 }
 
+/// Inserts or replaces the managed handoff block in the repository `.gitignore`.
 pub fn write_gitignore_block(repo_root: &Path) -> Result<()> {
     let gitignore_path = repo_root.join(".gitignore");
     let existing = fs::read_to_string(&gitignore_path).unwrap_or_default();
@@ -361,6 +376,7 @@ pub fn write_gitignore_block(repo_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Returns whether traversal should skip the directory at `path`.
 pub fn is_ignored_dir(path: &Path) -> bool {
     matches!(
         path.file_name().and_then(OsStr::to_str),
@@ -376,6 +392,7 @@ pub fn is_ignored_dir(path: &Path) -> bool {
     )
 }
 
+/// Runs `git` in `cwd` and returns its standard output.
 pub fn git_output<I, S>(cwd: &Path, args: I) -> Result<String>
 where
     I: IntoIterator<Item = S>,

@@ -1,3 +1,5 @@
+//! Repository surveys for handoff files and inline work markers.
+
 use std::{
     ffi::OsStr,
     fs,
@@ -29,6 +31,7 @@ pub struct TodoMarker {
     pub text: String,
 }
 
+/// Discovers handoff files and their active items beneath `base`.
 pub fn discover_handoffs(base: &Path, max_depth: usize) -> Result<Vec<SurveyHandoff>> {
     let base = fs::canonicalize(base)
         .with_context(|| format!("failed to canonicalize {}", base.display()))?;
@@ -113,6 +116,7 @@ pub fn discover_handoffs(base: &Path, max_depth: usize) -> Result<Vec<SurveyHand
     Ok(results)
 }
 
+/// Finds TODO-style markers in supported source files beneath `base`.
 pub fn discover_todo_markers(base: &Path, max_depth: usize) -> Result<Vec<TodoMarker>> {
     let base = fs::canonicalize(base)
         .with_context(|| format!("failed to canonicalize {}", base.display()))?;

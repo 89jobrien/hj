@@ -1,5 +1,8 @@
+//! Markdown renderers for handoff summaries and handover reports.
+
 use crate::{Handoff, HandoffItem, HandoffState};
 
+/// Renders a complete handoff summary with state, active items, and recent log entries.
 pub fn render_markdown(handoff: &Handoff, state: Option<&HandoffState>) -> String {
     let project = handoff.project.as_deref().unwrap_or("unknown");
     let updated = handoff.updated.as_deref().unwrap_or("unknown");
@@ -56,6 +59,7 @@ pub fn render_markdown(handoff: &Handoff, state: Option<&HandoffState>) -> Strin
     out
 }
 
+/// Renders the state, active items, and recent log sections for `HANDOVER.md`.
 pub fn render_handover_markdown(handoff: &Handoff, state: Option<&HandoffState>) -> String {
     let branch = state
         .and_then(|value| value.branch.as_deref())

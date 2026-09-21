@@ -1,3 +1,5 @@
+//! Conformance tests for repository discovery and refresh behavior.
+
 // §4 — hj-git → hj-core adapter contracts
 
 use hjlib::RepoContext;
@@ -225,7 +227,7 @@ fn s4_5_gitignore_block_is_idempotent() {
     assert_eq!(block_count, 1, "managed block must appear exactly once");
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// Repository fixture shared by the Git adapter tests.
 
 /// Creates a temp dir with a minimal git repo and a file at the given path.
 fn git_repo_with_file(rel_path: &str, contents: &str) -> tempfile::TempDir {

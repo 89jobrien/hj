@@ -1,3 +1,5 @@
+//! Command handlers for handoff discovery, lifecycle, rendering, and reconciliation.
+
 use std::{fs, io::Write, path::Path, process, process::Command};
 
 use anyhow::{Context, Result, anyhow, bail};

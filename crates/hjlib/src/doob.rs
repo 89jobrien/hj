@@ -1,3 +1,5 @@
+//! Adapter for reconciling handoff items with the `doob` todo CLI.
+
 use std::{collections::BTreeSet, path::Path, process::Command};
 
 use anyhow::{Context, Result, bail};
@@ -14,6 +16,7 @@ pub enum TodoStatus {
 }
 
 impl TodoStatus {
+    /// Returns the status spelling accepted by `doob todo list`.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -42,10 +45,12 @@ struct Todo {
 }
 
 impl DoobClient {
+    /// Creates a client that runs `doob` from `cwd`.
     pub fn new(cwd: impl Into<std::path::PathBuf>) -> Self {
         Self { cwd: cwd.into() }
     }
 
+    /// Lists non-empty todo titles for one project and status.
     pub fn list_titles(&self, project: &str, status: TodoStatus) -> Result<Vec<String>> {
         let output = Command::new("doob")
             .args([
@@ -75,6 +80,7 @@ impl DoobClient {
             .collect())
     }
 
+    /// Collects deduplicated active and closed titles for a project.
     pub fn snapshot(&self, project: &str) -> Result<TodoSnapshot> {
         Ok(TodoSnapshot {
             active_titles: unique_titles(
@@ -92,6 +98,7 @@ impl DoobClient {
         })
     }
 
+    /// Adds a project todo with the supplied priority and tags.
     pub fn add(&self, project: &str, title: &str, priority: u8, tags: &[String]) -> Result<()> {
         let mut command = Command::new("doob");
         command
@@ -113,6 +120,7 @@ impl DoobClient {
     }
 }
 
+/// Maps handoff priorities to `doob`'s numeric priority scale.
 pub fn map_priority(priority: Option<&str>) -> u8 {
     match priority {
         Some("P0") => 5,
@@ -122,6 +130,7 @@ pub fn map_priority(priority: Option<&str>) -> u8 {
     }
 }
 
+/// Sorts and deduplicates non-empty todo titles.
 pub fn unique_titles<I>(titles: I) -> Vec<String>
 where
     I: IntoIterator<Item = String>,
@@ -135,6 +144,7 @@ where
     set.into_iter().collect()
 }
 
+/// Verifies that the `doob` executable is available on `PATH`.
 pub fn ensure_doob_on_path(cwd: &Path) -> Result<()> {
     ensure_command("doob", cwd)
 }

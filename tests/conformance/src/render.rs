@@ -1,3 +1,5 @@
+//! Conformance tests for handoff and handover Markdown rendering.
+
 // §5 — hj-render → hj-core adapter contracts
 
 use hjlib::render::{render_handover_markdown, render_markdown};
@@ -219,7 +221,7 @@ fn s5_4_log_capped_at_five_entries() {
     assert!(!rendered.contains("Entry 7"));
 }
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// Item fixture shared by the rendering contract tests.
 
 fn item(id: &str, priority: &str, status: &str, title: &str) -> HandoffItem {
     HandoffItem {
