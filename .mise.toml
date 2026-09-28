@@ -44,7 +44,7 @@ run = [
 
 [tasks.install]
 description = "Install hj binaries from the current checkout into ~/.local"
-run = "cargo install --path crates/hj-cli --bins --force --root ~/.local"
+run = "cargo install --path crates/hjx --bins --force --root ~/.local"
 
 [tasks."examples:commands"]
 description = "Run all command demos from the examples directory"

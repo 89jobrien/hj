@@ -21,7 +21,7 @@ From crates.io:
 
 ```toml
 [dependencies]
-hjlib = "0.1.3"
+hjlib = "0.1.4"
 ```
 
 From this workspace:

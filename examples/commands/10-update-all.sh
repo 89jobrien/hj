@@ -10,5 +10,5 @@ install_root="$(dirname "$repo")/update-all-root"
 
 print_banner "hj update-all"
 print_cmd "$HJ_BIN update-all --root $install_root"
-printf 'This example requires registry/network access to install the published `hj-cli` package.\n'
+printf 'This example requires registry/network access to install the published `hjx` package.\n'
 printf 'Run it manually when network access is available.\n'

@@ -8,11 +8,10 @@ resolver = "2"
 
 [workspace.package]
 edition = "2024"
-version = "0.1.3"
+version = "0.1.4"
 license = "MIT"
 repository = "https://github.com/89jobrien/hj"
 homepage = "https://github.com/89jobrien/hj"
-documentation = "https://docs.rs/hj-cli"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
