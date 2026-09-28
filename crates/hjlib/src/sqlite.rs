@@ -62,6 +62,11 @@ impl HandoffDb {
     }
 
     /// Synchronizes one project's items and removes rows absent from the handoff.
+    ///
+    /// A terminal status already recorded in the database is not downgraded by a
+    /// handoff file that still lists the item as active. The database is the
+    /// authoritative record of resolution, so letting the stale YAML win would
+    /// silently resurrect resolved work on every refresh.
     pub fn upsert(&self, project: &str, handoff: &Handoff, today: &str) -> Result<UpsertReport> {
         let mut connection = self.open()?;
         Self::init_schema(&connection)?;
@@ -73,8 +78,18 @@ impl HandoffDb {
                 "INSERT INTO items (project, id, name, priority, status, completed, updated, issue)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                  ON CONFLICT(project, id) DO UPDATE SET
-                    status = excluded.status,
-                    completed = excluded.completed,
+                    status = CASE
+                        WHEN items.status IN ('done', 'closed')
+                             AND excluded.status NOT IN ('done', 'closed')
+                        THEN items.status
+                        ELSE excluded.status
+                    END,
+                    completed = CASE
+                        WHEN coalesce(items.completed, '') != ''
+                             AND coalesce(excluded.completed, '') = ''
+                        THEN items.completed
+                        ELSE excluded.completed
+                    END,
                     updated = excluded.updated,
                     issue = excluded.issue",
                 params![
@@ -153,6 +168,10 @@ impl HandoffDb {
     }
 
     /// Appends a serialized session log entry for a project.
+    ///
+    /// An entry matching the most recent entries on the same date with the same
+    /// commit list is skipped, so re-running a close does not duplicate a log
+    /// row. This mirrors the dedup applied to the JSONL log.
     pub fn log_append(
         &self,
         project: &str,
@@ -164,6 +183,21 @@ impl HandoffDb {
         Self::init_schema(&connection)?;
         let commits_json =
             serde_json::to_string(commits).context("failed to serialize commits to JSON")?;
+
+        let already_logged: bool = connection.query_row(
+            "SELECT EXISTS (
+                 SELECT 1 FROM log
+                 WHERE project = ?1 AND date = ?2 AND commits = ?3
+                 ORDER BY id DESC
+                 LIMIT 1
+             )",
+            params![project, date, commits_json],
+            |row| row.get(0),
+        )?;
+        if already_logged {
+            return Ok(());
+        }
+
         connection.execute(
             "INSERT INTO log (project, date, summary, commits) VALUES (?1, ?2, ?3, ?4)",
             params![project, date, summary, commits_json],
@@ -530,7 +564,10 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].date.as_deref(), Some("2026-04-22"));
         assert_eq!(entries[0].summary, "wired log persistence");
-        assert_eq!(entries[0].commits, vec![crate::CommitRef::Sha("abc1234".into())]);
+        assert_eq!(
+            entries[0].commits,
+            vec![crate::CommitRef::Sha("abc1234".into())]
+        );
         assert_eq!(entries[1].date.as_deref(), Some("2026-04-21"));
         assert_eq!(entries[1].commits, Vec::<crate::CommitRef>::new());
     }
@@ -557,6 +594,82 @@ mod tests {
         let hj_entries = db.log_query("hj").expect("hj query");
         assert_eq!(hj_entries.len(), 1);
         assert_eq!(hj_entries[0].summary, "hj session");
+    }
+
+    #[test]
+    fn upsert_does_not_resurrect_items_completed_in_the_database() {
+        // Regression: `hj handoff --force-refresh` re-upserts from the handoff
+        // file, which still lists a resolved item as active. Letting the stale
+        // YAML win overwrote `done` with `open` and brought the item back.
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let handoff = Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                priority: Some("P1".into()),
+                status: Some("open".into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        db.upsert("hj", &handoff, "2026-04-16").expect("upsert");
+        assert!(db.complete("hj", "hj-1", "2026-04-17").expect("complete"));
+
+        // Refresh re-upserts the same stale handoff file.
+        db.upsert("hj", &handoff, "2026-04-18").expect("refresh");
+
+        let rows = db.query("hj").expect("query");
+        assert_eq!(rows[0].status, "done", "completed item was resurrected");
+        assert_eq!(rows[0].completed, "2026-04-17", "completion date was lost");
+    }
+
+    #[test]
+    fn upsert_still_applies_status_transitions_in_both_directions() {
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let with_status = |status: &str| Handoff {
+            items: vec![HandoffItem {
+                id: "hj-1".into(),
+                priority: Some("P1".into()),
+                status: Some(status.into()),
+                ..HandoffItem::default()
+            }],
+            ..Handoff::default()
+        };
+
+        // open -> blocked must apply.
+        db.upsert("hj", &with_status("open"), "2026-04-16")
+            .expect("upsert open");
+        db.upsert("hj", &with_status("blocked"), "2026-04-17")
+            .expect("upsert blocked");
+        assert_eq!(db.query("hj").expect("query")[0].status, "blocked");
+
+        // done -> closed must apply.
+        assert!(db.complete("hj", "hj-1", "2026-04-18").expect("complete"));
+        db.upsert("hj", &with_status("closed"), "2026-04-19")
+            .expect("upsert closed");
+        assert_eq!(db.query("hj").expect("query")[0].status, "closed");
+    }
+
+    #[test]
+    fn log_append_skips_duplicate_date_and_commits() {
+        // Regression: repeated closes on the same day appended a new row every
+        // time, so the same session showed up multiple times in the log.
+        let tmp = tempdir().expect("tempdir");
+        let db = HandoffDb::with_path(tmp.path().join("handoff.db"));
+        let commits = vec!["abc1234".to_string()];
+
+        for _ in 0..3 {
+            db.log_append("hj", "2026-04-22", "session", &commits)
+                .expect("log_append");
+        }
+        assert_eq!(db.log_query("hj").expect("log_query").len(), 1);
+
+        // A different commit list is a different session and must be kept.
+        db.log_append("hj", "2026-04-22", "session", &["def5678".to_string()])
+            .expect("log_append distinct");
+        assert_eq!(db.log_query("hj").expect("log_query").len(), 2);
     }
 
     #[test]

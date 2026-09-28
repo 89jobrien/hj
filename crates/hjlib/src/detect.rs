@@ -327,6 +327,12 @@ pub fn find_root_handoff(repo_root: &Path) -> Result<Option<PathBuf>> {
 }
 
 /// Inserts or replaces the managed handoff block in the repository `.gitignore`.
+///
+/// The block ignores `.ctx/*` and then re-admits the handoff documents. State
+/// files must be re-ignored explicitly afterwards: the broad
+/// `!.ctx/HANDOFF.*.yaml` admission also matches
+/// `HANDOFF.<project>.<repo>.state.yaml`, and git applies the last matching
+/// pattern, so the re-ignore lines below are what actually win.
 pub fn write_gitignore_block(repo_root: &Path) -> Result<()> {
     let gitignore_path = repo_root.join(".gitignore");
     let existing = fs::read_to_string(&gitignore_path).unwrap_or_default();
@@ -334,11 +340,16 @@ pub fn write_gitignore_block(repo_root: &Path) -> Result<()> {
         "# handoff-begin",
         ".ctx/*",
         "!.ctx/HANDOFF.*.yaml",
-        ".ctx/HANDOFF.godmode.*.yaml",
-        ".ctx/HANDOFF.*.state.json",
         "!.ctx/handoff.*.config.toml.example",
+        // State files are emitted per crate and per project. Without these,
+        // the re-admission above leaves them untracked in every repo.
+        ".ctx/HANDOFF.*.state.yaml",
+        ".ctx/HANDOFF.*.*.state.yaml",
+        ".ctx/HANDOFF.*.state.json",
         ".ctx/HANDOFF.*.*.state.json",
-        ".ctx/HANDOFF.hj.hj.state.json",
+        ".ctx/HANDOFF.godmode.*.yaml",
+        ".ctx/HANDOFF.md",
+        ".ctx/HANDOVER.md",
         ".ctx/.initialized",
         "# handoff-end",
     ];
@@ -455,12 +466,82 @@ mod tests {
         let updated = fs::read_to_string(gitignore).unwrap();
 
         assert!(updated.contains(".ctx/*"));
-        assert!(updated.contains(".ctx/HANDOFF.*.*.state.json"));
-        assert!(updated.contains(".ctx/HANDOFF.hj.hj.state.json"));
         assert!(updated.contains(".ctx/HANDOFF.godmode.*.yaml"));
         assert!(updated.contains("target/"));
         assert!(updated.contains("node_modules/"));
         assert!(!updated.contains("\nold\n"));
+    }
+
+    #[test]
+    fn gitignore_block_ignores_state_files_but_admits_handoff_docs() {
+        let dir = tempfile::tempdir().unwrap();
+        git(dir.path(), &["init", "-q"]);
+        write_gitignore_block(dir.path()).unwrap();
+
+        let ignored = [
+            ".ctx/HANDOFF.hj-cli.hj.state.yaml",
+            ".ctx/HANDOFF.hj-core.hj.state.yaml",
+            ".ctx/HANDOFF.hj.hj.state.yaml",
+            ".ctx/HANDOFF.hj.hj.state.json",
+            ".ctx/HANDOFF.hj-git.hj.state.json",
+            ".ctx/HANDOFF.godmode.godmode.state.json",
+            ".ctx/HANDOFF.md",
+            ".ctx/HANDOVER.md",
+            ".ctx/.initialized",
+        ];
+        for path in ignored {
+            touch(&dir.path().join(path));
+            assert_eq!(
+                is_ignored(dir.path(), path),
+                Some(true),
+                "{path} should be ignored"
+            );
+        }
+
+        let admitted = [
+            ".ctx/HANDOFF.hj.hj.yaml",
+            ".ctx/HANDOFF.dedup-test.hj.yaml",
+            ".ctx/handoff.hj.config.toml.example",
+        ];
+        for path in admitted {
+            touch(&dir.path().join(path));
+            assert_eq!(
+                is_ignored(dir.path(), path),
+                Some(false),
+                "{path} should be tracked"
+            );
+        }
+    }
+
+    fn git(dir: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .status()
+            .expect("run git");
+        assert!(status.success(), "git {args:?} failed");
+    }
+
+    fn touch(path: &Path) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        fs::write(path, "x").expect("write file");
+    }
+
+    /// Returns `Some(true)`/`Some(false)` for ignored/not-ignored, `None` if
+    /// git reported no match (which means the path is not ignored).
+    fn is_ignored(dir: &Path, path: &str) -> Option<bool> {
+        let output = Command::new("git")
+            .args(["check-ignore", "--quiet", path])
+            .current_dir(dir)
+            .status()
+            .expect("run git check-ignore");
+        match output.code() {
+            Some(0) => Some(true),
+            Some(1) => Some(false),
+            other => panic!("git check-ignore exited with {other:?}"),
+        }
     }
 
     #[test]

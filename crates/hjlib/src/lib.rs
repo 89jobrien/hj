@@ -16,21 +16,19 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 /// A commit reference in a log entry. Accepts both a bare SHA string and the
-/// `{sha, branch}` object form. Serializes as `{sha, branch}` when branch is
-/// present, or a bare string when branch is absent (round-trips correctly).
+/// `{sha, branch}` object form. Serializes as a bare string when branch is
+/// absent and as `{sha, branch}` when branch is present, so it round-trips.
 ///
-/// Uses a hand-written `Deserialize` to coerce YAML-number SHA values (e.g.
-/// `7516e53` parses as float in YAML 1.2) to their string representation.
-#[derive(Debug, Clone, Serialize, Eq, PartialEq)]
+/// Both `Serialize` and `Deserialize` are hand-written. Deriving them would
+/// emit YAML's externally-tagged form (`!Sha abc1234` / `!Object {sha: ...}`),
+/// which is a tagged node that the reader rejects, so every write would render
+/// in a form the next read could not parse back.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CommitRef {
     /// Plain SHA string: `- abc1234`
     Sha(String),
     /// Object form: `- {sha: abc1234, branch: main}`
-    Object {
-        sha: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        branch: Option<String>,
-    },
+    Object { sha: String, branch: Option<String> },
 }
 
 impl CommitRef {
@@ -41,16 +39,65 @@ impl CommitRef {
             CommitRef::Object { sha, .. } => sha,
         }
     }
+
+    /// Parses a bare commit entry, accepting both plain and legacy tagged forms.
+    fn from_value(v: &serde_yaml::Value) -> Result<Self, String> {
+        // Unwrap the `!Sha` / `!Object` tags written by older hj builds, so
+        // files already on disk keep loading.
+        let v = match v {
+            serde_yaml::Value::Tagged(tagged) => &tagged.value,
+            other => other,
+        };
+
+        match v {
+            serde_yaml::Value::String(s) => Ok(CommitRef::Sha(s.clone())),
+            serde_yaml::Value::Number(n) => Err(format!(
+                "commit sha must be a quoted string, not the number {n} \
+                 (YAML reads unquoted hex like 7516e53 as a float and the \
+                 original digits are unrecoverable) — quote the value"
+            )),
+            serde_yaml::Value::Mapping(m) => {
+                let sha_val = m
+                    .get(serde_yaml::Value::String("sha".into()))
+                    .ok_or_else(|| "commit object is missing `sha`".to_string())?;
+                let sha = match sha_val {
+                    serde_yaml::Value::String(s) => s.clone(),
+                    serde_yaml::Value::Number(n) => {
+                        return Err(format!(
+                            "commit sha must be a quoted string, not the number {n} \
+                             (YAML reads unquoted hex like 7516e53 as a float and \
+                             the original digits are unrecoverable) — quote the value"
+                        ));
+                    }
+                    other => return Err(format!("commit sha is not a scalar: {other:?}")),
+                };
+                let branch = m
+                    .get(serde_yaml::Value::String("branch".into()))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string);
+                Ok(CommitRef::Object { sha, branch })
+            }
+            other => Err(format!(
+                "expected a SHA string or {{sha, branch}} object, got: {other:?}"
+            )),
+        }
+    }
 }
 
-/// Coerce any YAML scalar value to a String, handling the case where a SHA
-/// like `7516e53` is parsed by serde_yaml as a float.
-fn yaml_value_to_sha(v: &serde_yaml::Value) -> Option<String> {
-    match v {
-        serde_yaml::Value::String(s) => Some(s.clone()),
-        serde_yaml::Value::Number(n) => Some(format!("{n}")),
-        serde_yaml::Value::Bool(b) => Some(b.to_string()),
-        _ => None,
+impl Serialize for CommitRef {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        match self {
+            CommitRef::Sha(sha) => serializer.serialize_str(sha),
+            CommitRef::Object { sha, branch } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("sha", sha)?;
+                if let Some(branch) = branch {
+                    map.serialize_entry("branch", branch)?;
+                }
+                map.end()
+            }
+        }
     }
 }
 
@@ -58,33 +105,7 @@ impl<'de> serde::Deserialize<'de> for CommitRef {
     fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
         let v = serde_yaml::Value::deserialize(de)
             .map_err(|e| serde::de::Error::custom(e.to_string()))?;
-
-        match &v {
-            // Bare scalar — treat as plain SHA
-            serde_yaml::Value::String(s) => return Ok(CommitRef::Sha(s.clone())),
-            serde_yaml::Value::Number(n) => return Ok(CommitRef::Sha(format!("{n}"))),
-            _ => {}
-        }
-
-        // Mapping — expect {sha: ..., branch?: ...}
-        if let serde_yaml::Value::Mapping(ref m) = v {
-            let sha_key = serde_yaml::Value::String("sha".into());
-            let branch_key = serde_yaml::Value::String("branch".into());
-
-            if let Some(sha_val) = m.get(&sha_key) {
-                let sha = yaml_value_to_sha(sha_val).ok_or_else(|| {
-                    serde::de::Error::custom(format!(
-                        "commit sha is not a scalar: {sha_val:?}"
-                    ))
-                })?;
-                let branch = m.get(&branch_key).and_then(|v| v.as_str()).map(str::to_string);
-                return Ok(CommitRef::Object { sha, branch });
-            }
-        }
-
-        Err(serde::de::Error::custom(format!(
-            "expected a SHA string or {{sha, branch}} object, got: {v:?}"
-        )))
+        CommitRef::from_value(&v).map_err(serde::de::Error::custom)
     }
 }
 
@@ -196,6 +217,23 @@ pub struct LogEntry {
     pub extra: BTreeMap<String, serde_yaml::Value>,
 }
 
+impl LogEntry {
+    /// Returns whether this entry already records the same session, identified
+    /// by date, summary, and commit set.
+    ///
+    /// Re-running a close for a session that was already logged must not append
+    /// a second entry, so callers use this to detect an existing record.
+    pub fn matches_session(&self, date: &str, summary: &str, commits: &[String]) -> bool {
+        self.date.as_deref() == Some(date)
+            && self.summary == summary
+            && self
+                .commits
+                .iter()
+                .map(CommitRef::sha)
+                .eq(commits.iter().map(String::as_str))
+    }
+}
+
 impl<'de> serde::Deserialize<'de> for LogEntry {
     fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
         // Collect the entire YAML mapping into a Value first, then extract fields
@@ -203,10 +241,7 @@ impl<'de> serde::Deserialize<'de> for LogEntry {
         let map = serde_yaml::Mapping::deserialize(de)
             .map_err(|e| serde::de::Error::custom(e.to_string()))?;
 
-        let date = map
-            .get("date")
-            .and_then(|v| v.as_str())
-            .map(str::to_string);
+        let date = map.get("date").and_then(|v| v.as_str()).map(str::to_string);
 
         let summary = map
             .get("summary")
@@ -232,14 +267,20 @@ impl<'de> serde::Deserialize<'de> for LogEntry {
 
         let mut extra = BTreeMap::new();
         for (k, v) in &map {
-            if let Some(key) = k.as_str() {
-                if key != "date" && key != "summary" && key != "commits" {
-                    extra.insert(key.to_string(), v.clone());
-                }
+            if let Some(key) = k
+                .as_str()
+                .filter(|key| *key != "date" && *key != "summary" && *key != "commits")
+            {
+                extra.insert(key.to_string(), v.clone());
             }
         }
 
-        Ok(LogEntry { date, summary, commits, extra })
+        Ok(LogEntry {
+            date,
+            summary,
+            commits,
+            extra,
+        })
     }
 }
 
@@ -414,9 +455,7 @@ impl Handoff {
                     .map(|seq| {
                         seq.iter()
                             .filter_map(|v| match v {
-                                serde_yaml::Value::String(s) => {
-                                    Some(CommitRef::Sha(s.clone()))
-                                }
+                                serde_yaml::Value::String(s) => Some(CommitRef::Sha(s.clone())),
                                 serde_yaml::Value::Mapping(m) => {
                                     let sha = m
                                         .get(serde_yaml::Value::String("sha".into()))
@@ -795,13 +834,22 @@ log:
         let handoff: Handoff = serde_yaml::from_str(yaml).expect("parse");
         assert_eq!(
             handoff.log[0].commits,
-            vec![CommitRef::Sha("abc1234".into()), CommitRef::Sha("def5678".into())]
+            vec![
+                CommitRef::Sha("abc1234".into()),
+                CommitRef::Sha("def5678".into())
+            ]
         );
         assert_eq!(
             handoff.log[1].commits,
             vec![
-                CommitRef::Object { sha: "aaa1111".into(), branch: Some("main".into()) },
-                CommitRef::Object { sha: "bbb2222".into(), branch: Some("main".into()) },
+                CommitRef::Object {
+                    sha: "aaa1111".into(),
+                    branch: Some("main".into())
+                },
+                CommitRef::Object {
+                    sha: "bbb2222".into(),
+                    branch: Some("main".into())
+                },
             ]
         );
         // sha() accessor works for both forms
@@ -818,15 +866,125 @@ log:
   - date: "20260509.225051"
     summary: "Session 43: something"
     commits:
-      - sha: 659f1c2
+      - sha: "659f1c2"
         branch: main
-      - sha: 7516e53
+      - sha: "7516e53"
         branch: main
     session: 43
 "#;
         let handoff: Handoff = serde_yaml::from_str(yaml).expect("parse with session field");
         assert_eq!(handoff.log[0].commits.len(), 2);
         assert_eq!(handoff.log[0].commits[0].sha(), "659f1c2");
+    }
+
+    #[test]
+    fn commit_ref_round_trips_through_untagged_yaml() {
+        // Regression: the derived Serialize emitted YAML's externally-tagged form
+        // (`!Sha abc1234` / `!Object {sha: ...}`), which the reader then rejected
+        // as an unrecognised commit entry, dropping every commit on rewrite.
+        for original in [
+            CommitRef::Sha("abc1234".into()),
+            CommitRef::Sha("7516e53".into()),
+            CommitRef::Object {
+                sha: "abc1234".into(),
+                branch: Some("main".into()),
+            },
+            CommitRef::Object {
+                sha: "abc1234".into(),
+                branch: None,
+            },
+        ] {
+            let yaml = serde_yaml::to_string(&original).expect("serialize");
+            assert!(
+                !yaml.contains('!'),
+                "commit ref must not emit a YAML tag: {yaml}"
+            );
+            let back: CommitRef = serde_yaml::from_str(&yaml).expect("deserialize");
+            assert_eq!(back, original, "round trip changed {original:?}");
+        }
+    }
+
+    #[test]
+    fn commit_ref_reads_legacy_tagged_form() {
+        // Files written by older builds carry `!Sha` / `!Object` tags; they must
+        // still load rather than dropping the commit.
+        let sha: CommitRef = serde_yaml::from_str("!Sha abc1234").expect("legacy Sha");
+        assert_eq!(sha, CommitRef::Sha("abc1234".into()));
+
+        let object: CommitRef =
+            serde_yaml::from_str("!Object\nsha: abc1234\nbranch: main").expect("legacy Object");
+        assert_eq!(
+            object,
+            CommitRef::Object {
+                sha: "abc1234".into(),
+                branch: Some("main".into())
+            }
+        );
+    }
+
+    #[test]
+    fn commit_ref_rejects_unquoted_numeric_sha_instead_of_mangling_it() {
+        // YAML reads unquoted `7516e53` as the float 7.516e56. Coercing that
+        // back to text produced the bogus sha "7.516e56"; it must be refused
+        // instead, so the corruption is visible rather than written to disk.
+        let err = serde_yaml::from_str::<CommitRef>("7516e53")
+            .expect_err("unquoted numeric sha must be rejected");
+        assert!(err.to_string().contains("quoted string"), "{err}");
+
+        let mapping = serde_yaml::from_str::<CommitRef>("{sha: 7516e53, branch: main}")
+            .expect_err("unquoted numeric sha in object form must be rejected");
+        assert!(mapping.to_string().contains("quoted string"), "{mapping}");
+    }
+
+    #[test]
+    fn log_entry_session_identity_ignores_commit_form() {
+        // The same session is recorded with a bare sha in one place and a
+        // {sha, branch} object in another; both must compare equal.
+        let bare = LogEntry {
+            date: Some("2026-09-28".into()),
+            summary: "session".into(),
+            commits: vec![CommitRef::Sha("abc1234".into())],
+            extra: BTreeMap::new(),
+        };
+        let object = LogEntry {
+            commits: vec![CommitRef::Object {
+                sha: "abc1234".into(),
+                branch: Some("main".into()),
+            }],
+            ..bare.clone()
+        };
+
+        let commits = vec!["abc1234".to_string()];
+        assert!(bare.matches_session("2026-09-28", "session", &commits));
+        assert!(object.matches_session("2026-09-28", "session", &commits));
+
+        // A different date, summary, or commit set is a different session.
+        assert!(!bare.matches_session("2026-09-27", "session", &commits));
+        assert!(!bare.matches_session("2026-09-28", "other", &commits));
+        assert!(!bare.matches_session("2026-09-28", "session", &[]));
+        assert!(!bare.matches_session("2026-09-28", "session", &["deadbee".to_string()]));
+    }
+
+    #[test]
+    fn log_entry_written_by_hj_reparses_without_losing_commits() {
+        let original = LogEntry {
+            date: Some("2026-09-28".into()),
+            summary: "session".into(),
+            commits: vec![
+                CommitRef::Object {
+                    sha: "abc1234".into(),
+                    branch: Some("main".into()),
+                },
+                CommitRef::Sha("7516e53".into()),
+            ],
+            extra: BTreeMap::new(),
+        };
+
+        let yaml = serde_yaml::to_string(&original).expect("serialize");
+        let reparsed: LogEntry = serde_yaml::from_str(&yaml).expect("reparse");
+        assert_eq!(reparsed.commits, original.commits);
+        assert_eq!(reparsed.summary, original.summary);
+        assert_eq!(reparsed.date, original.date);
     }
 
     #[test]
@@ -975,7 +1133,10 @@ log:
         assert_eq!(handoff.log.len(), 1);
         assert_eq!(handoff.log[0].date.as_deref(), Some("20260424:152652"));
         assert_eq!(handoff.log[0].summary, "did stuff");
-        assert_eq!(handoff.log[0].commits, vec![CommitRef::Sha("abc123".into())]);
+        assert_eq!(
+            handoff.log[0].commits,
+            vec![CommitRef::Sha("abc123".into())]
+        );
         assert!(!descriptions.is_empty());
     }
 

@@ -181,16 +181,30 @@ pub(crate) fn handoff_db(args: DbArgs) -> Result<()> {
         }
         DbCommand::Complete(args) => {
             let today = today(Path::new("."))?;
-            db.complete(&args.project, &args.id, &today)?;
-            println!("marked done: {}/{}", args.project, args.id);
+            if db.complete(&args.project, &args.id, &today)? {
+                println!("marked done: {}/{}", args.project, args.id);
+            } else {
+                bail!(
+                    "no item '{}' in project '{}' — nothing to complete",
+                    args.id,
+                    args.project
+                );
+            }
         }
         DbCommand::Status(args) => {
             let today = today(Path::new("."))?;
-            db.set_status(&args.project, &args.id, &args.status, &today)?;
-            println!(
-                "status updated: {}/{} -> {}",
-                args.project, args.id, args.status
-            );
+            if db.set_status(&args.project, &args.id, &args.status, &today)? {
+                println!(
+                    "status updated: {}/{} -> {}",
+                    args.project, args.id, args.status
+                );
+            } else {
+                bail!(
+                    "no item '{}' in project '{}' — nothing to update",
+                    args.id,
+                    args.project
+                );
+            }
         }
     }
     Ok(())
@@ -235,29 +249,41 @@ pub(crate) fn close(args: CloseArgs) -> Result<()> {
             args.commits.clone()
         };
         shas.into_iter()
-            .map(|sha| CommitRef::Object { sha, branch: Some(branch.clone()) })
+            .map(|sha| CommitRef::Object {
+                sha,
+                branch: Some(branch.clone()),
+            })
             .collect()
     } else {
         Vec::new()
     };
 
+    let sha_list: Vec<String> = log_commits.iter().map(|c| c.sha().to_string()).collect();
+
+    // Re-running a close for a session already in the log must not append a
+    // second entry to the handoff document.
     if let Some(ref summary) = args.log_summary {
-        handoff.log.insert(
-            0,
-            LogEntry {
-                date: Some(today.clone()),
-                summary: summary.clone(),
-                commits: log_commits.clone(),
-                ..LogEntry::default()
-            },
-        );
+        let already_logged = handoff
+            .log
+            .iter()
+            .any(|entry| entry.matches_session(&today, summary, &sha_list));
+        if !already_logged {
+            handoff.log.insert(
+                0,
+                LogEntry {
+                    date: Some(today.clone()),
+                    summary: summary.clone(),
+                    commits: log_commits.clone(),
+                    ..LogEntry::default()
+                },
+            );
+        }
     }
 
     let mut state = build_state(&context, &paths, args.build, args.tests, args.notes)?;
 
     let db = HandoffDb::new()?;
     if let Some(ref summary) = args.log_summary {
-        let sha_list: Vec<String> = log_commits.iter().map(|c| c.sha().to_string()).collect();
         db.log_append(&paths.project, &today, summary, &sha_list)?;
         append_jsonl_log(&paths.project, &today, summary, &sha_list)?;
         state.last_log = Some(summary.clone());
@@ -974,15 +1000,33 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let log_path = dir.path().join("handoff-log.jsonl");
 
-        append_jsonl_log_to("test-proj", "2026-06-27", "first write", &["abc123".to_string()], &log_path).unwrap();
-        append_jsonl_log_to("test-proj", "2026-06-27", "duplicate", &["abc123".to_string()], &log_path).unwrap();
+        append_jsonl_log_to(
+            "test-proj",
+            "2026-06-27",
+            "first write",
+            &["abc123".to_string()],
+            &log_path,
+        )
+        .unwrap();
+        append_jsonl_log_to(
+            "test-proj",
+            "2026-06-27",
+            "duplicate",
+            &["abc123".to_string()],
+            &log_path,
+        )
+        .unwrap();
 
         let lines: Vec<_> = std::fs::read_to_string(&log_path)
             .unwrap()
             .lines()
             .map(String::from)
             .collect();
-        assert_eq!(lines.len(), 1, "duplicate (date, project, commits) must be skipped");
+        assert_eq!(
+            lines.len(),
+            1,
+            "duplicate (date, project, commits) must be skipped"
+        );
     }
 
     #[test]

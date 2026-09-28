@@ -51,7 +51,12 @@ pub fn render_markdown(handoff: &Handoff, state: Option<&HandoffState>) -> Strin
             out.push_str(&format!(
                 "- {date}: {} [{}]\n",
                 entry.summary,
-                entry.commits.iter().map(|c| c.sha()).collect::<Vec<_>>().join(", ")
+                entry
+                    .commits
+                    .iter()
+                    .map(|c| c.sha())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
     }
@@ -106,7 +111,12 @@ pub fn render_handover_markdown(handoff: &Handoff, state: Option<&HandoffState>)
             out.push_str(&format!(
                 "- {date}: {} [{}]\n",
                 entry.summary,
-                entry.commits.iter().map(|c| c.sha()).collect::<Vec<_>>().join(", ")
+                entry
+                    .commits
+                    .iter()
+                    .map(|c| c.sha())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
         }
     }
